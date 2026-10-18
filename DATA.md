@@ -32,3 +32,22 @@ No scraping, no third-party APIs.
 Data is published by the Government of Malaysia under the Open Data Terms of Use 1.0.
 Prasarana feeds are CC BY 4.0. Attribute "Data source: data.gov.my / Prasarana / KTMB"
 in any public build.
+
+## Refresh
+
+`scripts/refresh.sh` rebuilds the database from the three feeds and swaps it in atomically:
+
+- the new DB is built in `data/jalan.db.tmp`, then `rename()`d over `data/jalan.db` — a reader sees
+  either the old complete file or the new complete file, never a half-built one;
+- stale `-wal` / `-shm` sidecars from the previous file are removed after the swap;
+- `ingest/api.mjs` checks the file mtime on every request and reopens when it changes, so a refresh
+  needs no restart;
+- cron runs the script daily at **16:10 UTC = 00:10 MYT** (KTMB publishes 00:01 MYT);
+- output is appended to `data/ingest.log`.
+
+Manual run:
+
+```bash
+scripts/refresh.sh          # same path cron uses
+npm run ingest -- --force   # equivalent, without the log wrapper
+```

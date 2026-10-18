@@ -9,7 +9,7 @@
  * Static data only. Realtime (vehicle positions) is a separate poller — see DATA.md.
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { FEEDS } from "./feeds.mjs";
@@ -22,6 +22,7 @@ const only = onlyIdx >= 0 ? args[onlyIdx + 1] : null;
 
 const CACHE = resolve(".cache/gtfs");
 const DB_PATH = resolve("data/jalan.db");
+const TMP_PATH = `${DB_PATH}.tmp`;
 const MAX_AGE_MS = 20 * 60 * 60 * 1000;
 
 mkdirSync(CACHE, { recursive: true });
@@ -60,10 +61,10 @@ function read(dir, name) {
 function toInt(v) { return v ? Number(v) : 0; }
 
 function main(feeds) {
-  rmSync(DB_PATH, { force: true });
-  const db = new DatabaseSync(DB_PATH);
+  // Build beside the live file, then swap atomically. Readers never see a half-built DB.
+  rmSync(TMP_PATH, { force: true });
+  const db = new DatabaseSync(TMP_PATH);
   db.exec(`
-    PRAGMA journal_mode = WAL;
     CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
     CREATE TABLE stops (feed TEXT, stop_id TEXT, stop_name TEXT, lat REAL, lon REAL, category TEXT, PRIMARY KEY (feed, stop_id));
     CREATE TABLE routes (feed TEXT, route_id TEXT, short_name TEXT, long_name TEXT, route_type TEXT, color TEXT, text_color TEXT, category TEXT, PRIMARY KEY (feed, route_id));
@@ -150,6 +151,11 @@ function main(feeds) {
   const total = db.prepare("SELECT COUNT(*) AS n FROM stop_times").get().n;
   insMeta.run("total_stop_times", String(total));
   db.close();
+
+  renameSync(TMP_PATH, DB_PATH);
+  // Stale sidecars belong to the previous inode; leaving them would confuse the next reader.
+  rmSync(`${DB_PATH}-wal`, { force: true });
+  rmSync(`${DB_PATH}-shm`, { force: true });
   log(`\nbuilt ${DB_PATH} — ${total} stop_times`);
 }
 
