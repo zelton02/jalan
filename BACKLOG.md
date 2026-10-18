@@ -68,3 +68,18 @@ LRT → KL Sentral, **86 min**. The old fixed "8 min walk to Bukit Dukung" is go
 departures, and an origin that is an address, not a station.
 
 **Blocks.** Nothing; `stops.lat/lon` is already ingested for every feed.
+
+## 3. Benchmark against Google (after the move)
+
+**When.** After Zhi Heng moves (lease ends Nov 2026), on the new home → destination pair.
+
+**Method.** 50 random departure times, run our router and Google Directions for the same query.
+
+**Pass line.**
+- 90% of queries within **±3 min** of Google's arrival time
+- every itinerary is actually catchable (no 0-minute transfers)
+- transfers ≤ Google's
+- walking time within **±2 min**
+
+**Requirement this imposes now.** The router must accept an **address or coordinate** as origin, not a
+hardcoded stop — otherwise a new home needs a code change, which defeats the point of the benchmark.
