@@ -57,3 +57,22 @@ npm run ingest -- --force   # equivalent, without the log wrapper
 `stops.txt` carries rename artefacts such as `KL SENTRAL - REDONE`. Query results strip a trailing
 ` - REDONE` before display. Names are otherwise kept in the feed's uppercase form — they read like
 platform signage, and title-casing mangles acronyms like `KL`.
+
+### Realtime availability (verified 2026-10-19)
+
+| Feed | Endpoint | Status |
+| --- | --- | --- |
+| Prasarana rail (`rapid-rail-kl`) | `/gtfs-realtime/vehicle-position/prasarana?category=rapid-rail-kl` | **404 — does not exist** |
+| Prasarana bus KL | `...?category=rapid-bus-kl` | 200, protobuf, empty outside service hours |
+| MRT feeder bus | `...?category=rapid-bus-mrtfeeder` | 200, has `trip_id` + `route_id`; 2 vehicles at 01:21 |
+| KTMB | `/gtfs-realtime/vehicle-position/ktmb` | 200, empty outside service hours |
+
+Response body for rail:
+
+```json
+{"status_code": 404, "details": ["Vehicle Position feed for prasarana (rapid-rail-kl) does not exist."]}
+```
+
+Consequence: **the MRT/LRT corridor cannot show live positions.** Any "live" indicator on this route would be
+a fabrication. Position must stay schedule-derived until Prasarana publishes rail realtime. Realtime is only
+possible on feeds that exist (KTMB, buses).
