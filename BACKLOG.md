@@ -83,3 +83,27 @@ departures, and an origin that is an address, not a station.
 
 **Requirement this imposes now.** The router must accept an **address or coordinate** as origin, not a
 hardcoded stop — otherwise a new home needs a code change, which defeats the point of the benchmark.
+
+## 4. Crowd-sourced line status (the Waze model)
+
+**Why.** `rapid-rail-kl` has no realtime feed (404). Crowd reports are the only way to learn that a
+line is down before the operator announces it.
+
+**What Waze actually does.** Not "reporting" — *aggregation, decay, and rerouting*. A report is
+useless unless it (a) is corroborated, (b) expires, and (c) changes the route.
+
+**v1 design.**
+
+- One tap, three observations a rider can actually make: **tiada tren** (no train), **sesak**
+  (crowded), **gangguan** (disruption). No free text.
+- Location from GPS, snapped to the nearest station; station also selectable.
+- A report **expires in 15 min** unless others confirm it.
+- Status shows **count + age**, never a verdict: `3 laporan · 4 min lalu`, not "line down".
+- Two independent devices within 10 min and 300 m before anything is shown as `kemungkinan gangguan`.
+- When confirmed on a leg, the router offers the alternative (e.g. bus 590 instead of MRT+LRT).
+
+**The two traps.**
+
+1. **Cold start** — with one user this is silent for months. Build the pipe anyway; collect from day 1.
+2. **Absence ≠ normal** — "no reports" must read `Tiada laporan`, never `Normal`. Otherwise the app
+   claims everything is fine when nobody is looking.
