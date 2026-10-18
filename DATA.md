@@ -76,3 +76,25 @@ Response body for rail:
 Consequence: **the MRT/LRT corridor cannot show live positions.** Any "live" indicator on this route would be
 a fabrication. Position must stay schedule-derived until Prasarana publishes rail realtime. Realtime is only
 possible on feeds that exist (KTMB, buses).
+
+## Realtime collection
+
+`ingest/realtime.mjs` samples every vehicle-position feed once a minute into `data/realtime.db`:
+
+- `vp(ts, feed, vid, trip, route, dir, lat, lon, speed, bearing)` — one row per vehicle per minute;
+- `poll(ts, feed, status, bytes, n, error)` — one row per fetch, so gaps are visible as data;
+- retention: 60 days (deleted daily by the collector itself).
+
+Runs as the systemd unit `jalan-realtime` (`Restart=always`), started 2026-10-19.
+
+Why collect before there is a feature: the official feeds only expose *now*. Headways, bunching and
+travel times can only be measured from history, and history cannot be backfilled. Feeds sampled:
+`rapid-bus-kl`, `rapid-bus-mrtfeeder`, `ktmb`. Rail is absent upstream (see above), so nothing is
+collected for MRT/LRT.
+
+Check it is alive:
+
+```bash
+systemctl status jalan-realtime --no-pager
+sqlite3 data/realtime.db 'select feed, count(*), max(ts) from vp group by feed;'
+```

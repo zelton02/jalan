@@ -39,3 +39,23 @@ filled dot — labelled as estimated from the schedule, because it is.
 
 **Still missing.** The dot is an inference from the timetable, not a live position. It becomes true
 only when live vehicle positions land.
+
+## 2. Door-to-door from Sungai Long Residence
+
+**Ask.** From home: which bus stop to walk to, which bus, which station to get off, whether to
+transfer, and how long each walk takes.
+
+**What the data says (2026-10-19).**
+
+- Nearest stop: `KJ438 SG LONG GOLF & COUNTRY CLUB`, **325 m** from Bandar Sungai Long.
+- Only route serving it: **590** (`U5900`, *Bandar Sungai Long ~ Hab Pasar Seni*), 103 stops,
+  first trip 05:30, reaching Pasar Seni in ~31 min on the early trip.
+- 590 passes **181 m** from a Kajang-line station at `KJ338 KOMERSIAL BT 11`, and ends **54 m** from
+  `KJ14 / KG16 Pasar Seni` — so it works both as a bus-to-MRT feeder and as a one-seat ride.
+- Walking to Bukit Dukung is **not** realistic: the station is ~3.6 km from the housing area. The
+  current plan's fixed "8 min walk to Bukit Dukung" is fabricated and must be replaced.
+
+**Needs.** Walking legs computed from stop coordinates (distance ÷ ~75 m/min), bus legs with real
+departures, and an origin that is an address, not a station.
+
+**Blocks.** Nothing; `stops.lat/lon` is already ingested for every feed.
