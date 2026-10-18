@@ -3,7 +3,7 @@
 Decisions waiting for a build slot. Each entry keeps the *reason*, not just the feature, so a
 later change can be judged against it.
 
-## 1. Expand the intermediate stops on a ride leg
+## 1. Expand the intermediate stops on a ride leg — SHIPPED 2026-10-19
 
 **Ask.** On the journey screen, `14 stesen` should open into the actual station list, with the
 current position marked.
@@ -33,4 +33,9 @@ No new feed needed.
 - Collapse returns the layout to exactly its previous height.
 - Works with the API unreachable (cached list).
 
-**Not now.** Agreed on 2026-10-19; revisit after the first real trip test.
+**Status.** Shipped. The list opens under the ride leg, shows 15 stations with times, marks boarding
+(`NAIK`) and alighting (`TURUN`), and marks the station the train should have reached by now with a
+filled dot — labelled as estimated from the schedule, because it is.
+
+**Still missing.** The dot is an inference from the timetable, not a live position. It becomes true
+only when live vehicle positions land.

@@ -80,6 +80,15 @@ export function directionServing(db, feed, routeId, fromId, toId) {
   return row ? row.dir : null;
 }
 
+function stopNames(db, feed) {
+  const clean = (name) => name.replace(/\s*-\s*REDONE\s*$/i, "").trim();
+  return new Map(
+    db.prepare("SELECT stop_id, stop_name FROM stops WHERE feed = ?")
+      .all(feed)
+      .map((r) => [r.stop_id, clean(r.stop_name)])
+  );
+}
+
 /** Earliest ride on one route between two stops, expanding frequency-based trips. */
 export function findRide(db, { feed, routeId, fromId, toId, afterSec, ymd, weekday }) {
   const dir = directionServing(db, feed, routeId, fromId, toId);
@@ -93,6 +102,7 @@ export function findRide(db, { feed, routeId, fromId, toId, afterSec, ymd, weekd
        AND service_id IN (${services.map(() => "?").join(",")})`
   ).all(feed, routeId, dir, ...services);
 
+  const names = stopNames(db, feed);
   let best = null;
   for (const trip of trips) {
     const times = db.prepare(
@@ -102,11 +112,13 @@ export function findRide(db, { feed, routeId, fromId, toId, afterSec, ymd, weekd
     if (times.length < 2) continue;
 
     const firstDep = sec(times[0].departure);
-    const from = times.find((t) => t.stop_id === fromId);
-    const to = times.find((t) => t.stop_id === toId);
-    if (firstDep == null || !from || !to) continue;
-    if (from.stop_sequence >= to.stop_sequence) continue;
+    const fromIdx = times.findIndex((t) => t.stop_id === fromId);
+    const toIdx = times.findIndex((t) => t.stop_id === toId);
+    if (firstDep == null || fromIdx < 0 || toIdx < 0) continue;
+    if (fromIdx >= toIdx) continue;
 
+    const from = times[fromIdx];
+    const to = times[toIdx];
     const offFrom = sec(from.departure) - firstDep;
     const offTo = sec(to.arrival) - firstDep;
     const freqs = db.prepare(`SELECT start_time, end_time, headway_secs FROM frequencies WHERE feed = ? AND trip_id = ?`).all(feed, trip.trip_id);
@@ -125,12 +137,20 @@ export function findRide(db, { feed, routeId, fromId, toId, afterSec, ymd, weekd
     }
 
     if (start == null) continue;
+
+    const stations = times.slice(fromIdx, toIdx + 1).map((t, i) => {
+      // Origin uses departure; every other station uses arrival (the moment you get there).
+      const at = i === 0 ? sec(t.departure) : (sec(t.arrival) ?? sec(t.departure));
+      return { name: names.get(t.stop_id) ?? t.stop_id, time: at == null ? null : hhmm(start + at - firstDep) };
+    });
+
     const ride = {
       tripId: trip.trip_id,
       headsign: trip.headsign,
       dep: start + offFrom,
       arr: start + offTo,
-      stops: to.stop_sequence - from.stop_sequence,
+      stops: stations.length - 1,
+      stations,
       directionId: dir,
     };
     if (!best || ride.dep < best.dep) best = ride;
@@ -174,9 +194,9 @@ export function planCorridor(db, { atSec }) {
       source: { feed: "rail", ingested_at: metaMap(db)["rail:ingested_at"] ?? null },
       legs: [
         { kind: "walk", start: hhmm(dep + date.offset), duration: "8 min", title: "Jalan kaki ke MRT Bukit Dukung", subtitle: "Walk to Bukit Dukung MRT" },
-        { kind: "ride", start: hhmm(ride1.dep + date.offset), duration: `${Math.round((ride1.arr - ride1.dep) / 60)} min`, title: "MRT ke Pasar Seni", subtitle: `${ride1.stops} stesen`, line: "kajang", stops: `${ride1.stops} stop${ride1.stops === 1 ? "" : "s"}`, headsign: ride1.headsign },
+        { kind: "ride", start: hhmm(ride1.dep + date.offset), duration: `${Math.round((ride1.arr - ride1.dep) / 60)} min`, title: "MRT ke Pasar Seni", line: "kajang", stations: ride1.stations, headsign: ride1.headsign },
         { kind: "transfer", start: hhmm(ride1.arr + date.offset), duration: "5 min", title: "Tukar ke LRT Kelana Jaya", subtitle: "Transfer at Pasar Seni", line: "kelana" },
-        { kind: "ride", start: hhmm(ride2.dep + date.offset), duration: `${Math.round((ride2.arr - ride2.dep) / 60)} min`, title: "LRT ke KL Sentral", subtitle: `${ride2.stops} stesen`, line: "kelana", stops: `${ride2.stops} stop${ride2.stops === 1 ? "" : "s"}`, headsign: ride2.headsign },
+        { kind: "ride", start: hhmm(ride2.dep + date.offset), duration: `${Math.round((ride2.arr - ride2.dep) / 60)} min`, title: "LRT ke KL Sentral", line: "kelana", stations: ride2.stations, headsign: ride2.headsign },
         { kind: "arrive", start: hhmm(arrive + date.offset), duration: "", title: "Sampai di KL Sentral", subtitle: "Arrive · exit B" },
       ],
     };

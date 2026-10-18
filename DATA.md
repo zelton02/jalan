@@ -51,3 +51,9 @@ Manual run:
 scripts/refresh.sh          # same path cron uses
 npm run ingest -- --force   # equivalent, without the log wrapper
 ```
+
+### Stop-name cleaning
+
+`stops.txt` carries rename artefacts such as `KL SENTRAL - REDONE`. Query results strip a trailing
+` - REDONE` before display. Names are otherwise kept in the feed's uppercase form — they read like
+platform signage, and title-casing mangles acronyms like `KL`.

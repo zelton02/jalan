@@ -1,5 +1,7 @@
 export type LineId = "kajang" | "kelana" | "ampang" | "ktm" | "bus";
 
+export type Station = { name: string; time: string | null };
+
 export type PlanLeg = {
   kind: "walk" | "ride" | "transfer" | "arrive";
   start: string;
@@ -7,7 +9,7 @@ export type PlanLeg = {
   title: string;
   subtitle?: string;
   line?: LineId;
-  stops?: string;
+  stations?: Station[];
   headsign?: string;
 };
 
