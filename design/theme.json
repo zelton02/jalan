@@ -1,0 +1,30 @@
+{
+  "$comment": "jalan's expression layer. Values only \u2014 the rules live in AESTHETIC.md.",
+  "color": {
+    "ink": "#14161a",
+    "ink-muted": "#5b6068",
+    "paper": "#f7f5ef",
+    "surface": "#ffffff",
+    "hairline": "rgba(20, 22, 26, 0.12)",
+    "action": "#0b6b3a",
+    "action-ink": "#ffffff",
+    "alert": "#a15c00",
+    "danger": "#a4161a",
+    "focus": "#1d4ed8",
+    "on-line": "#ffffff"
+  },
+  "line": {
+    "kajang": "#1b7f4b",
+    "kelana": "#8a1538",
+    "ampang": "#b45309",
+    "ktm": "#1f4e79",
+    "bus": "#5b6068"
+  },
+  "radius": {
+    "none": "0",
+    "sm": "2px",
+    "md": "4px",
+    "lg": "6px",
+    "pill": "999px"
+  }
+}
