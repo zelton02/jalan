@@ -7,8 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "tokens": "node ../sistem/packages/tokens/build.mjs --theme design/theme.json --out src/styles/tokens.css",
-    "audit": "node ../sistem/packages/lint/audit.mjs src"
+    "tokens": "node ../keystone/packages/tokens/build.mjs --theme design/theme.json --out src/styles/tokens.css",
+    "audit": "node ../keystone/packages/lint/audit.mjs src"
   },
   "dependencies": {
     "react": "^18.3.1",

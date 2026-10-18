@@ -2,7 +2,7 @@
 
 A transit app for Malaysia — *how do I get from here to there, and what do I do next.*
 
-Built as the first consumer of [`sistem`](https://github.com/zelton02/sistem), the design-system engine. The point of
+Built as the first consumer of [`keystone`](https://github.com/zelton02/keystone), the design-system engine. The point of
 this repo is not the feature set; it is proving that a written aesthetic contract survives
 contact with a real screen.
 
@@ -24,10 +24,10 @@ That stance produces the rules in [`AESTHETIC.md`](./AESTHETIC.md). Read it befo
 
 ## Run
 
-Clone both repos side by side — the token/lint scripts expect `../sistem`:
+Clone both repos side by side — the token/lint scripts expect `../keystone`:
 
 ```bash
-git clone https://github.com/zelton02/sistem
+git clone https://github.com/zelton02/keystone
 git clone https://github.com/zelton02/jalan
 cd jalan
 npm install
