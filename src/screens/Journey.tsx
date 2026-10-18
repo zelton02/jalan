@@ -1,18 +1,19 @@
 import Alert from "../components/Alert";
 import Button from "../components/Button";
 import LineBadge from "../components/LineBadge";
-import { type Route } from "../data/routes";
+import { lineShort } from "../data/lines";
+import type { Plan, PlanLeg } from "../types";
 
-const kindLabel: Record<string, string> = {
+const kindLabel: Record<PlanLeg["kind"], string> = {
   walk: "JALAN / WALK",
-  wait: "TUNGGU / WAIT",
   ride: "NAIK / RIDE",
   transfer: "TUKAR / TRANSFER",
   arrive: "SAMPAI / ARRIVE",
 };
 
-export default function Journey({ route, onBack }: { route: Route; onBack: () => void }) {
-  const current = route.legs[0];
+export default function Journey({ plan, onBack }: { plan: Plan; onBack: () => void }) {
+  const next = plan.legs[0];
+  const offline = typeof navigator !== "undefined" && !navigator.onLine;
 
   return (
     <div className="screen screen--journey">
@@ -21,41 +22,37 @@ export default function Journey({ route, onBack }: { route: Route; onBack: () =>
           ←
         </Button>
         <div>
-          <div className="eyebrow">SUNGAI LONG → KL SENTRAL</div>
-          <h1 className="h2">{route.total} · {route.fare}</h1>
+          <div className="eyebrow">{plan.origin.toUpperCase()} → {plan.destination.toUpperCase()}</div>
+          <h1 className="h2">{plan.total_minutes} min · sampai {plan.arrive}</h1>
         </div>
       </header>
 
-      {route.notice ? <Alert>{route.notice}</Alert> : null}
-      {!navigator.onLine ? <Alert>Luar talian. Waktu dianggarkan. / Offline — times are estimates.</Alert> : null}
+      {offline ? <Alert>Luar talian. Waktu dianggarkan. / Offline — times are estimates.</Alert> : null}
 
       <ol className="steps">
-        {route.legs.map((leg, index) => {
-          const isNext = index === 0;
-          return (
-            <li key={leg.id} className={`step ${isNext ? "step--next" : ""}`}>
-              <div className="step__time">{leg.start}</div>
-              <div className="step__rail" aria-hidden="true">
-                <span className="step__dot" />
+        {plan.legs.map((leg, index) => (
+          <li key={`${leg.kind}-${leg.start}-${index}`} className={`step ${index === 0 ? "step--next" : ""}`}>
+            <div className="step__time">{leg.start}</div>
+            <div className="step__rail" aria-hidden="true">
+              <span className="step__dot" />
+            </div>
+            <div className="step__body">
+              <div className="eyebrow">{kindLabel[leg.kind]}</div>
+              <div className="step__title">{leg.title}</div>
+              {leg.subtitle ? <div className="step__sub">{leg.subtitle}</div> : null}
+              <div className="step__meta">
+                {leg.line ? <LineBadge line={leg.line} short={lineShort[leg.line]} /> : null}
+                {leg.duration ? <span>{leg.duration}</span> : null}
+                {leg.stops ? <span>{leg.stops}</span> : null}
               </div>
-              <div className="step__body">
-                <div className="eyebrow">{kindLabel[leg.kind]}</div>
-                <div className="step__title">{leg.title}</div>
-                {leg.subtitle ? <div className="step__sub">{leg.subtitle}</div> : null}
-                <div className="step__meta">
-                  {leg.line ? <LineBadge line={leg.line} short={leg.line.toUpperCase()} /> : null}
-                  {leg.duration ? <span>{leg.duration}</span> : null}
-                  {leg.stops ? <span>{leg.stops}</span> : null}
-                </div>
-              </div>
-            </li>
-          );
-        })}
+            </div>
+          </li>
+        ))}
       </ol>
 
       <div className="bottom">
         <div className="bottom__label">SETERUSNYA / NEXT</div>
-        <div className="bottom__next">{current.title} · {current.duration}</div>
+        <div className="bottom__next">{next.title} · {next.start}</div>
         <Button variant="primary" block>
           Mula / Start
         </Button>

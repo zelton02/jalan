@@ -1,8 +1,18 @@
 import LineBadge from "../components/LineBadge";
 import Button from "../components/Button";
-import { routes, type Route } from "../data/routes";
+import { lineShort } from "../data/lines";
+import type { Plan } from "../types";
 
-export default function Results({ onBack, onSelect }: { onBack: () => void; onSelect: (route: Route) => void }) {
+type Props = { plan: Plan; onBack: () => void; onSelect: () => void };
+
+export default function Results({ plan, onBack, onSelect }: Props) {
+  const transfers = plan.legs.filter((leg) => leg.kind === "transfer").length;
+  const lines = plan.legs.filter((leg) => leg.line).map((leg) => leg.line!);
+  const unique = [...new Set(lines)];
+  const ingested = plan.source.ingested_at
+    ? new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kuala_Lumpur", dateStyle: "short", timeStyle: "short" }).format(new Date(plan.source.ingested_at))
+    : "—";
+
   return (
     <div className="screen">
       <header className="topbar">
@@ -10,34 +20,34 @@ export default function Results({ onBack, onSelect }: { onBack: () => void; onSe
           ←
         </Button>
         <div>
-          <div className="eyebrow">SUNGAI LONG → KL SENTRAL</div>
-          <h1 className="h2">{routes.length} laluan / routes</h1>
+          <div className="eyebrow">{plan.origin.toUpperCase()} → {plan.destination.toUpperCase()}</div>
+          <h1 className="h2">1 laluan / route</h1>
         </div>
       </header>
 
       <ul className="plain-list">
-        {routes.map((route) => (
-          <li key={route.id}>
-            <button type="button" className="route" onClick={() => onSelect(route)}>
-              <div className="route__top">
-                <span className="route__time">{route.total}</span>
-                <span className="route__fare">{route.fare}</span>
-              </div>
-              <div className="route__meta">
-                {route.transfers} tukar / transfer · sampai {route.arrive}
-              </div>
-              <div className="route__lines">
-                {route.lines.map((line) => (
-                  <LineBadge key={line} line={line} short={line.toUpperCase()} />
-                ))}
-                <span className="route__tag">{route.tags[0]}</span>
-              </div>
-            </button>
-          </li>
-        ))}
+        <li>
+          <button type="button" className="route" onClick={onSelect}>
+            <div className="route__top">
+              <span className="route__time">{plan.total_minutes} min</span>
+              <span className="route__fare">{plan.depart} → {plan.arrive}</span>
+            </div>
+            <div className="route__meta">
+              {transfers} tukar / transfer · sampai {plan.arrive}
+            </div>
+            <div className="route__lines">
+              {unique.map((line) => (
+                <LineBadge key={line} line={line} short={lineShort[line]} />
+              ))}
+              <span className="route__tag">Jadual rasmi</span>
+            </div>
+          </button>
+        </li>
       </ul>
 
-      <p className="footnote">Ketuk satu laluan untuk langkah demi langkah.</p>
+      <p className="footnote">
+        Jadual: {ingested} MYT{plan.clock?.startsWith("pinned") ? ` · demo clock ${plan.clock.slice(7)}` : ""} · {plan.legs.length} langkah.
+      </p>
     </div>
   );
 }

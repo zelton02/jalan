@@ -1,8 +1,11 @@
 import { useState } from "react";
 import Field from "../components/Field";
 import Button from "../components/Button";
+import Alert from "../components/Alert";
 
-export default function Search({ onSearch }: { onSearch: () => void }) {
+type Props = { onSearch: (from: string, to: string) => void; loading: boolean; error: string | null };
+
+export default function Search({ onSearch, loading, error }: Props) {
   const [from, setFrom] = useState("Sungai Long");
   const [to, setTo] = useState("KL Sentral");
 
@@ -26,25 +29,24 @@ export default function Search({ onSearch }: { onSearch: () => void }) {
         <Field label="KE" sublabel="TO" value={to} onChange={setTo} placeholder="Destinasi" />
       </div>
 
-      <Button variant="primary" block onClick={onSearch}>
-        Cari laluan / Find routes
+      {error ? <Alert>{error}</Alert> : null}
+
+      <Button variant="primary" block onClick={() => onSearch(from, to)} disabled={loading}>
+        {loading ? "Mencari… / Searching…" : "Cari laluan / Find routes"}
       </Button>
+      <p className="footnote">Buat masa ini: Sungai Long → KL Sentral sahaja. / This corridor only, for now.</p>
 
       <section className="section">
         <div className="eyebrow">BARU-BARU / RECENT</div>
         <ul className="plain-list">
           <li className="recent">
-            <span>Sungai Long → KLCC</span>
-            <span className="recent__meta">MRT · 54 min</span>
-          </li>
-          <li className="recent">
-            <span>Kajang → Mid Valley</span>
-            <span className="recent__meta">KTM · 47 min</span>
+            <span>Sungai Long → KL Sentral</span>
+            <span className="recent__meta">MRT · LRT</span>
           </li>
         </ul>
       </section>
 
-      <p className="footnote">Data contoh. Waktu dan tambang bukan masa sebenar.</p>
+      <p className="footnote">Jadual rasmi data.gov.my. Waktu berubah mengikut perkhidmatan.</p>
     </div>
   );
 }

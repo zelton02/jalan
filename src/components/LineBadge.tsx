@@ -1,4 +1,5 @@
-import { lineNames, type LineId } from "../data/routes";
+import { lineNames } from "../data/lines";
+import type { LineId } from "../types";
 
 export default function LineBadge({ line, short }: { line: LineId; short?: string }) {
   return (
