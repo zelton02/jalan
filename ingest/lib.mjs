@@ -203,3 +203,97 @@ export function planCorridor(db, { atSec }) {
   }
   return null;
 }
+
+const FEEDER_FEED = "mrtfeeder";
+const FEEDER_ROUTE = "30000094";
+const FEEDER_FROM = "12000972"; // SG. LONG CLUB HOUSE
+const FEEDER_TO = "12001792";   // MRT BUKIT DUKUNG PINTU A
+const WALK_TO_STOP_MIN = 4;     // 323 m at ~75 m/min
+const WALK_TO_PLATFORM_MIN = 1;
+
+/** Next T453 from Sungai Long to the MRT bay, with its own stop list. */
+function nextFeederRide(db, { afterSec, ymd, weekday }) {
+  const services = [...activeServices(db, FEEDER_FEED, ymd, weekday)];
+  if (!services.length) return null;
+  const trips = db.prepare(
+    `SELECT trip_id FROM trips WHERE feed = ? AND route_id = ?
+       AND service_id IN (${services.map(() => "?").join(",")})`
+  ).all(FEEDER_FEED, FEEDER_ROUTE, ...services);
+
+  const names = stopNames(db, FEEDER_FEED);
+  let best = null;
+  for (const trip of trips) {
+    const times = db.prepare(
+      `SELECT stop_id, arrival, departure, stop_sequence FROM stop_times
+       WHERE feed = ? AND trip_id = ? ORDER BY stop_sequence`
+    ).all(FEEDER_FEED, trip.trip_id);
+    if (times.length < 2) continue;
+
+    const fromIdx = times.findIndex((t) => t.stop_id === FEEDER_FROM);
+    if (fromIdx < 0) continue;
+    // The loop visits the station twice; take the visit after the origin.
+    const toIdx = times.findIndex((t, i) => i > fromIdx && t.stop_id === FEEDER_TO);
+    if (toIdx < 0) continue;
+
+    const dep = sec(times[fromIdx].departure);
+    if (dep == null || dep < afterSec) continue;
+    if (!best || dep < best.dep) {
+      best = {
+        dep,
+        arr: sec(times[toIdx].departure) ?? sec(times[toIdx].arrival),
+        tripId: trip.trip_id,
+        stations: times.slice(fromIdx, toIdx + 1).map((t, i) => {
+          const at = i === 0 ? sec(t.departure) : (sec(t.arrival) ?? sec(t.departure));
+          return { name: names.get(t.stop_id) ?? t.stop_id, time: at == null ? null : hhmm(at) };
+        }),
+      };
+    }
+  }
+  return best;
+}
+
+/** Door-to-door from Sungai Long to KL Sentral: feeder bus first, then MRT + LRT. */
+export function planDoorToDoor(db, { atSec }) {
+  const now = atSec ?? klNow().seconds;
+  const kl = klNow();
+  const dates = [{ ymd: kl.ymd, weekday: kl.weekday, offset: 0 }];
+  if (now < 4 * 3600) dates.unshift({ ...dayBefore(kl.ymd), offset: -86400 });
+
+  for (const date of dates) {
+    const leave = now;
+    const feeder = nextFeederRide(db, { afterSec: leave + WALK_TO_STOP_MIN * 60, ymd: date.ymd, weekday: date.weekday });
+    if (!feeder) continue;
+
+    const atPlatform = feeder.arr + WALK_TO_PLATFORM_MIN * 60;
+    const mrt1 = findRide(db, {
+      feed: "rail", routeId: "KGL", fromId: "KG31", toId: "KG16",
+      afterSec: atPlatform, ymd: date.ymd, weekday: date.weekday,
+    });
+    if (!mrt1) continue;
+    const mrt2 = findRide(db, {
+      feed: "rail", routeId: "KJ", fromId: "KJ14", toId: "KJ15",
+      afterSec: mrt1.arr + 5 * 60, ymd: date.ymd, weekday: date.weekday,
+    });
+    if (!mrt2) continue;
+
+    const arrive = mrt2.arr + 5 * 60;
+    return {
+      origin: "Sungai Long",
+      destination: "KL Sentral",
+      depart: hhmm(leave),
+      arrive: hhmm(arrive + date.offset),
+      total_minutes: Math.round((arrive - leave) / 60),
+      source: { feed: FEEDER_FEED, ingested_at: metaMap(db)[`${FEEDER_FEED}:ingested_at`] ?? null },
+      legs: [
+        { kind: "walk", start: hhmm(leave + date.offset), duration: `${WALK_TO_STOP_MIN} min`, title: "Jalan kaki ke hentian T453", subtitle: "SG. LONG CLUB HOUSE · 323 m" },
+        { kind: "ride", start: hhmm(feeder.dep + date.offset), duration: `${Math.round((feeder.arr - feeder.dep) / 60)} min`, title: "Bas T453 ke MRT Bukit Dukung", line: "bus", stations: feeder.stations },
+        { kind: "walk", start: hhmm(feeder.arr + date.offset), duration: `${WALK_TO_PLATFORM_MIN} min`, title: "Jalan kaki ke platform", subtitle: "MRT Bukit Dukung" },
+        { kind: "ride", start: hhmm(mrt1.dep + date.offset), duration: `${Math.round((mrt1.arr - mrt1.dep) / 60)} min`, title: "MRT ke Pasar Seni", line: "kajang", stations: mrt1.stations },
+        { kind: "transfer", start: hhmm(mrt1.arr + date.offset), duration: "5 min", title: "Tukar ke LRT Kelana Jaya", subtitle: "Transfer at Pasar Seni", line: "kelana" },
+        { kind: "ride", start: hhmm(mrt2.dep + date.offset), duration: `${Math.round((mrt2.arr - mrt2.dep) / 60)} min`, title: "LRT ke KL Sentral", line: "kelana", stations: mrt2.stations },
+        { kind: "arrive", start: hhmm(arrive + date.offset), duration: "", title: "Sampai di KL Sentral", subtitle: "Arrive · exit B" },
+      ],
+    };
+  }
+  return null;
+}

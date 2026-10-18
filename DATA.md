@@ -5,13 +5,30 @@ No scraping, no third-party APIs.
 
 ## Sources
 
-| Feed | Endpoint | Refresh | Notes |
+| Feed | key | Region | Notes |
 | --- | --- | --- | --- |
-| Rapid Rail KL | `https://api.data.gov.my/gtfs-static/prasarana?category=rapid-rail-kl` | as required | LRT / MRT / Monorail / BRT |
-| Rapid Bus KL | `https://api.data.gov.my/gtfs-static/prasarana?category=rapid-bus-kl` | as required | City buses |
-| Rapid Bus MRT Feeder | `https://api.data.gov.my/gtfs-static/prasarana?category=rapid-bus-mrtfeeder` | as required | Feeder buses to MRT stations (e.g. T453) |
-| KTMB | `https://api.data.gov.my/gtfs-static/ktmb` | daily 00:01 | Komuter / ETS |
-| Vehicle positions (RT) | `https://api.data.gov.my/gtfs-realtime/vehicle-position/<agency>` | every 30s | **Positions only** |
+| Rapid Rail KL | `rail` | Klang Valley | LRT / MRT / Monorail / BRT |
+| Rapid Bus KL | `bus` | Klang Valley | City buses |
+| Rapid Bus MRT Feeder | `mrtfeeder` | Klang Valley | Feeder buses to MRT stations (e.g. T453) |
+| Rapid Bus Penang | `penang` | Pulau Pinang | City buses |
+| BAS.MY Kangar | `kangar` | Perlis | Stage buses |
+| BAS.MY Alor Setar | `alor-setar` | Kedah | Stage buses |
+| BAS.MY Kota Bharu | `kota-bharu` | Kelantan | **published empty** (headers only) |
+| BAS.MY Kuala Terengganu | `kuala-terengganu` | Terengganu | **published empty** (headers only) |
+| BAS.MY Ipoh | `ipoh` | Perak | Stage buses |
+| BAS.MY Melaka | `melaka` | Melaka | Stage buses |
+| BAS.MY Johor Bahru | `johor` | Johor | Stage buses |
+| BAS.MY Kuching | `kuching` | Sarawak | Stage buses |
+| KTMB | `ktmb` | National | Komuter / ETS |
+| Vehicle positions (RT) | — | — | every 30s, **positions only** |
+
+Endpoints follow `https://api.data.gov.my/gtfs-static/<path>`: Prasarana uses
+`prasarana?category=rapid-rail-kl|rapid-bus-kl|rapid-bus-mrtfeeder|rapid-bus-penang`, BAS.MY uses
+`mybas-<city>`, KTMB uses `ktmb`. `rapid-bus-kuantan` is gone (404).
+
+Two feeds publish only headers: `mybas-kota-bharu` and `mybas-kuala-terengganu` return a valid zip whose
+`stops.txt` / `trips.txt` / `stop_times.txt` contain no rows. They are ingested as empty rather than
+treated as errors, so the gap shows up in the counts instead of crashing the refresh.
 
 ## Known limitations
 
@@ -27,6 +44,9 @@ No scraping, no third-party APIs.
 4. **Fares are not in GTFS.** No fare_attributes.txt / fare_rules.txt in the rail feed.
 5. **Timezone**: `Asia/Kuala_Lumpur`. Service days roll over around 04:00 local, and times
    can exceed 24:00:00.
+6. **Stop names repeat across states.** 96 names exist in more than one feed (`HOSPITAL`,
+   `TERMINAL`, …). Any stop lookup must either filter by `feed` or refuse to guess — `next.mjs`
+   lists candidates and exits when a name spans feeds.
 
 ## Licence
 
@@ -36,7 +56,7 @@ in any public build.
 
 ## Refresh
 
-`scripts/refresh.sh` rebuilds the database from the three feeds and swaps it in atomically:
+`scripts/refresh.sh` rebuilds the database from every feed in `ingest/feeds.mjs` and swaps it in atomically:
 
 - the new DB is built in `data/jalan.db.tmp`, then `rename()`d over `data/jalan.db` — a reader sees
   either the old complete file or the new complete file, never a half-built one;

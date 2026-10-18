@@ -40,7 +40,7 @@ filled dot — labelled as estimated from the schedule, because it is.
 **Still missing.** The dot is an inference from the timetable, not a live position. It becomes true
 only when live vehicle positions land.
 
-## 2. Door-to-door from Sungai Long Residence
+## 2. Door-to-door from Sungai Long Residence — SHIPPED 2026-10-19
 
 **Ask.** From home: which bus stop to walk to, which bus, which station to get off, whether to
 transfer, and how long each walk takes.
@@ -60,8 +60,9 @@ transfer, and how long each walk takes.
   current plan's fixed "8 min walk to Bukit Dukung" is fabricated and must be replaced by the T453
   feeder leg.
 
-**Working CLI.** `npm run door -- --at 08:00` prints the real chain: walk 4 min → T453 (08:08) →
-MRT KG31 (08:27) → Pasar Seni → LRT → KL Sentral (09:26), 86 min total.
+**Shipped.** `lib.planDoorToDoor()` is now the single source for both `npm run door` and `/api/plan`.
+The app shows the real chain: walk 4 min → T453 (9 stops) → MRT KG31 (15 stops) → Pasar Seni →
+LRT → KL Sentral, **86 min**. The old fixed "8 min walk to Bukit Dukung" is gone.
 
 **Needs.** Walking legs computed from stop coordinates (distance ÷ ~75 m/min), bus legs with real
 departures, and an origin that is an address, not a station.

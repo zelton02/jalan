@@ -81,6 +81,28 @@ if (!stops.length) {
   console.error(`stop not found: ${stopArg}`);
   process.exit(1);
 }
+
+// With 12 feeds, the same name can exist in several states. Never guess silently.
+const needle = stopArg.toUpperCase();
+const rank = (s) => {
+  const id = s.stop_id.toUpperCase();
+  const name = s.stop_name.toUpperCase();
+  if (id === needle) return 0;
+  if (name === needle) return 1;
+  if (name.startsWith(needle)) return 2;
+  return 3;
+};
+stops.sort((a, b) => rank(a) - rank(b) || a.stop_name.length - b.stop_name.length);
+
+const matchedFeeds = new Set(stops.map((s) => s.feed));
+if (matchedFeeds.size > 1 && !feedArg) {
+  console.error(`"${stopArg}" appears in ${matchedFeeds.size} feeds — choose one with --feed:`);
+  for (const s of stops.slice(0, 10)) {
+    console.error(`  --feed ${s.feed.padEnd(14)} ${s.stop_id.padEnd(9)} ${s.stop_name}`);
+  }
+  process.exit(1);
+}
+
 const stop = stops[0];
 if (stops.length > 1) {
   console.error(`matched ${stops.length} stops, using ${stop.feed}:${stop.stop_id} ${stop.stop_name}`);

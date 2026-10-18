@@ -12,7 +12,7 @@
 import { createServer } from "node:http";
 import { statSync } from "node:fs";
 import { resolve } from "node:path";
-import { planCorridor, openDb, metaMap } from "./lib.mjs";
+import { planDoorToDoor, openDb, metaMap } from "./lib.mjs";
 
 const argv = process.argv.slice(2);
 const atIdx = argv.indexOf("--at");
@@ -58,7 +58,7 @@ createServer((req, res) => {
   }
 
   if (url.pathname === "/api/plan") {
-    const plan = withDb((current) => planCorridor(current, { atSec: pinned ?? undefined }));
+    const plan = withDb((current) => planDoorToDoor(current, { atSec: pinned ?? undefined }));
     if (!plan) return json(res, 404, { error: "no service for this corridor right now" });
     return json(res, 200, { ...plan, clock: pinned != null ? `pinned ${atArg}` : "live" });
   }
