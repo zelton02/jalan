@@ -22,6 +22,20 @@ That stance produces the rules in [`AESTHETIC.md`](./AESTHETIC.md). Read it befo
 | --- | --- | --- |
 | ![](pr-assets/screen-search.png) | ![](pr-assets/screen-results.png) | ![](pr-assets/screen-journey.png) |
 
+## Data pipeline
+
+The app runs on Malaysia's official GTFS feeds, not mock data.
+
+```bash
+npm run ingest                                  # download 3 feeds -> data/jalan.db
+npm run next -- --stop KG31 --dir north         # next MRT at Bukit Dukung
+npm run next -- --feed ktmb --stop Kajang --at 08:00
+npm run next -- --stop KG31 --dir north --json  # machine-readable
+```
+
+See [`DATA.md`](./DATA.md) for sources, refresh cadence, and the known limitations
+(frequency-based rail feed, no official delay feed, dirty fields).
+
 ## Run
 
 Clone both repos side by side — the token/lint scripts expect `../keystone`:
