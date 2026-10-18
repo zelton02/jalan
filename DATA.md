@@ -8,7 +8,8 @@ No scraping, no third-party APIs.
 | Feed | Endpoint | Refresh | Notes |
 | --- | --- | --- | --- |
 | Rapid Rail KL | `https://api.data.gov.my/gtfs-static/prasarana?category=rapid-rail-kl` | as required | LRT / MRT / Monorail / BRT |
-| Rapid Bus KL | `https://api.data.gov.my/gtfs-static/prasarana?category=rapid-bus-kl` | as required | Includes MRT feeder routes |
+| Rapid Bus KL | `https://api.data.gov.my/gtfs-static/prasarana?category=rapid-bus-kl` | as required | City buses |
+| Rapid Bus MRT Feeder | `https://api.data.gov.my/gtfs-static/prasarana?category=rapid-bus-mrtfeeder` | as required | Feeder buses to MRT stations (e.g. T453) |
 | KTMB | `https://api.data.gov.my/gtfs-static/ktmb` | daily 00:01 | Komuter / ETS |
 | Vehicle positions (RT) | `https://api.data.gov.my/gtfs-realtime/vehicle-position/<agency>` | every 30s | **Positions only** |
 

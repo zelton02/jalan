@@ -47,13 +47,21 @@ transfer, and how long each walk takes.
 
 **What the data says (2026-10-19).**
 
-- Nearest stop: `KJ438 SG LONG GOLF & COUNTRY CLUB`, **325 m** from Bandar Sungai Long.
-- Only route serving it: **590** (`U5900`, *Bandar Sungai Long ~ Hab Pasar Seni*), 103 stops,
-  first trip 05:30, reaching Pasar Seni in ~31 min on the early trip.
+- **Correction (2026-10-19):** the first pass said "only route 590" because the **MRT feeder feed
+  was never ingested**. `rapid-bus-mrtfeeder` is a separate category; it is now in `FEEDS`.
+- Nearest stop: `SL CLUB HOUSE` (`12000972`), **323 m** from Bandar Sungai Long.
+- Feeder **T453** (`MRT Bukit Dukung ~ Bandar Sungai Long`), 24 stops, 90 trips/day, 06:00–23:30,
+  stops 34 m from KG31. Home → station is **14 min** on the bus.
+- Second option: **590** (`U5900`, *Bandar Sungai Long ~ Hab Pasar Seni*), 103 stops, first trip
+  05:30, ~31 min to Pasar Seni on the early trip.
 - 590 passes **181 m** from a Kajang-line station at `KJ338 KOMERSIAL BT 11`, and ends **54 m** from
   `KJ14 / KG16 Pasar Seni` — so it works both as a bus-to-MRT feeder and as a one-seat ride.
 - Walking to Bukit Dukung is **not** realistic: the station is ~3.6 km from the housing area. The
-  current plan's fixed "8 min walk to Bukit Dukung" is fabricated and must be replaced.
+  current plan's fixed "8 min walk to Bukit Dukung" is fabricated and must be replaced by the T453
+  feeder leg.
+
+**Working CLI.** `npm run door -- --at 08:00` prints the real chain: walk 4 min → T453 (08:08) →
+MRT KG31 (08:27) → Pasar Seni → LRT → KL Sentral (09:26), 86 min total.
 
 **Needs.** Walking legs computed from stop coordinates (distance ÷ ~75 m/min), bus legs with real
 departures, and an origin that is an address, not a station.

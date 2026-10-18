@@ -11,6 +11,11 @@ export const FEEDS = [
     url: "https://api.data.gov.my/gtfs-static/prasarana?category=rapid-bus-kl",
   },
   {
+    key: "mrtfeeder",
+    label: "Rapid Bus MRT Feeder",
+    url: "https://api.data.gov.my/gtfs-static/prasarana?category=rapid-bus-mrtfeeder",
+  },
+  {
     key: "ktmb",
     label: "KTMB",
     url: "https://api.data.gov.my/gtfs-static/ktmb",

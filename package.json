@@ -10,7 +10,8 @@
     "tokens": "node ../keystone/packages/tokens/build.mjs --theme design/theme.json --out src/styles/tokens.css",
     "audit": "node ../keystone/packages/lint/audit.mjs src",
     "ingest": "node --no-warnings ingest/ingest.mjs",
-    "next": "node --no-warnings ingest/next.mjs"
+    "next": "node --no-warnings ingest/next.mjs",
+    "door": "node --no-warnings ingest/door.mjs"
   },
   "dependencies": {
     "gtfs-realtime-bindings": "^2.2.0",
