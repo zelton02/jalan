@@ -1,4 +1,15 @@
-export type LineId = "kajang" | "kelana" | "ampang" | "ktm" | "bus";
+export type LineId =
+  | "kajang"
+  | "putrajaya"
+  | "kelana"
+  | "ampang"
+  | "sri"
+  | "monorail"
+  | "shahalam"
+  | "brt"
+  | "ktm"
+  | "rail"
+  | "bus";
 
 export type Station = { name: string; time: string | null };
 

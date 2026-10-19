@@ -94,9 +94,14 @@ export const lineIdFor = (feed, routeId) => {
   if (feed === "ktmb") return "ktm";
   if (feed === "rail") {
     if (routeId === "KGL") return "kajang";
+    if (routeId === "PYL") return "putrajaya";
     if (routeId === "KJ") return "kelana";
-    if (routeId === "AG" || routeId === "PH") return "ampang";
-    return undefined;
+    if (routeId === "AG") return "ampang";
+    if (routeId === "PH") return "sri";
+    if (routeId === "MR") return "monorail";
+    if (routeId === "SA") return "shahalam";
+    if (routeId === "BRT") return "brt";
+    return "rail";
   }
   return "bus";
 };

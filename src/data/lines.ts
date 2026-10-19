@@ -2,17 +2,29 @@ import type { LineId, Plan } from "../types";
 
 export const lineNames: Record<LineId, string> = {
   kajang: "MRT Kajang",
+  putrajaya: "MRT Putrajaya",
   kelana: "LRT Kelana Jaya",
   ampang: "LRT Ampang",
+  sri: "LRT Sri Petaling",
+  monorail: "KL Monorail",
+  shahalam: "LRT Shah Alam",
+  brt: "BRT Sunway",
   ktm: "KTM Komuter",
+  rail: "Rail",
   bus: "Bas",
 };
 
 export const lineShort: Record<LineId, string> = {
   kajang: "KGL",
+  putrajaya: "PYL",
   kelana: "KJ",
   ampang: "AG",
+  sri: "SP",
+  monorail: "MR",
+  shahalam: "SA",
+  brt: "BRT",
   ktm: "KTM",
+  rail: "RAIL",
   bus: "BUS",
 };
 
@@ -33,8 +45,8 @@ export function planRouteColors(plan: Plan): Map<string, string> {
     if (leg.kind !== "ride") continue;
     const key = leg.routeId ?? leg.route ?? "bus";
     if (colors.has(key)) continue;
-    if (leg.line && leg.line !== "bus") colors.set(key, cssVar(`--line-${leg.line}`) || "#0b6b3a");
-    else colors.set(key, BUS_PALETTE[bus++ % BUS_PALETTE.length]);
+    if (!leg.line || leg.line === "bus") colors.set(key, BUS_PALETTE[bus++ % BUS_PALETTE.length]);
+    else colors.set(key, cssVar(`--line-${leg.line}`) || "#0b6b3a");
   }
   return colors;
 }

@@ -49,10 +49,16 @@
   --layout-max-width: 30rem;
   --layout-inset: 1.25rem;
   --layout-tap-min: 44px;
-  /* line */
-  --line-kajang: #1b7f4b;
-  --line-kelana: #8a1538;
-  --line-ampang: #b45309;
+  /* line — Rapid KL signage colours (Wikipedia: Module:Adjacent stations/Rapid KL) */
+  --line-kajang: #11753a;
+  --line-putrajaya: #faca05;
+  --line-kelana: #e0115f;
+  --line-ampang: #fe8e10;
+  --line-sri: #721422;
+  --line-monorail: #7dba00;
+  --line-shahalam: #59b8e6;
+  --line-brt: #1e4d2b;
   --line-ktm: #1f4e79;
+  --line-rail: #5b6068;
   --line-bus: #5b6068;
 }

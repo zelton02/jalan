@@ -40,9 +40,11 @@ required, light personal use).
   anchored to the nearest shape point with a forward-only search so loop services do not fold
   back; a stop more than 300 m off the shape means the feed's geometry skips that detour, and the
   leg is drawn as a faded straight line instead. Slices are downsampled to 300 points.
-- Every ride keeps its own colour: rail legs use the line's signage colour from `tokens.css`, bus
-  routes take the next palette slot in plan order (so two bus legs never share one). A legend
-  under the map names them.
+- Every ride keeps its own colour: rail legs use the line's signage colour from `tokens.css`
+  (Kajang green `#11753a`, Putrajaya yellow `#faca05`, Kelana Jaya `#e0115f`, Ampang `#fe8e10`,
+  Sri Petaling `#721422`, Monorail `#7dba00`, Shah Alam `#59b8e6`, BRT `#1e4d2b`, KTM `#1f4e79`),
+  bus routes take the next palette slot in plan order (so two bus legs never share one). A legend
+  under the map names them. Pale lines get a dark casing so yellow stays readable.
 - Boarding and alighting points get a white dot ringed in the line's colour; a dashed ink ring
   marks the platform where a transfer happens.
 - Walk and transfer legs use the OSRM footpath geometry, requested once per leg at response time

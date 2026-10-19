@@ -10,6 +10,17 @@ const MUTED = "#5b6068";
 const INK = "#14161a";
 const VEHICLE = "#1d4ed8";
 
+/** Yellow and pale lines need a dark casing; everything else reads fine on white. */
+const isLightColor = (color: string) => {
+  const match = /^#?([0-9a-f]{6})$/i.exec(color.trim());
+  if (!match) return false;
+  const value = Number.parseInt(match[1], 16);
+  const r = (value >> 16) & 255;
+  const g = (value >> 8) & 255;
+  const b = value & 255;
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.62;
+};
+
 const dotIcon = (color: string) =>
   L.divIcon({
     className: "map-dot",
@@ -92,7 +103,10 @@ export default function RouteMap({ plan, focus = null, vehicles = [], compact = 
       const color = colorForLeg(leg);
       if (leg.polyline?.length) {
         if (leg.kind === "ride") {
-          L.polyline(leg.polyline, { color, weight: 5, opacity: 0.92, lineJoin: "round" }).addTo(group);
+          // Casing first so pale line colours (Putrajaya yellow) stay readable on the map.
+          const casing = isLightColor(color) ? { color: INK, opacity: 0.45 } : { color: "#ffffff", opacity: 0.85 };
+          L.polyline(leg.polyline, { ...casing, weight: 9, lineJoin: "round" }).addTo(group);
+          L.polyline(leg.polyline, { color, weight: 5, opacity: 0.95, lineJoin: "round" }).addTo(group);
           rides.push(leg.polyline);
         } else {
           // Walk / transfer: the OSRM footpath when the API returned one.

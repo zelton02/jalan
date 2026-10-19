@@ -619,9 +619,15 @@ button {
 }
 
 .badge--kajang { background: var(--line-kajang); }
+.badge--putrajaya { background: var(--line-putrajaya); color: var(--color-ink); }
 .badge--kelana { background: var(--line-kelana); }
 .badge--ampang { background: var(--line-ampang); }
+.badge--sri { background: var(--line-sri); }
+.badge--monorail { background: var(--line-monorail); color: var(--color-ink); }
+.badge--shahalam { background: var(--line-shahalam); color: var(--color-ink); }
+.badge--brt { background: var(--line-brt); }
 .badge--ktm { background: var(--line-ktm); }
+.badge--rail { background: var(--line-rail); }
 .badge--bus { background: var(--line-bus); }
 
 /* Status */
