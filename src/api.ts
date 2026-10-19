@@ -1,11 +1,16 @@
 import type { Plan } from "./types";
 
-export async function fetchPlan(from: string, to: string, signal?: AbortSignal): Promise<Plan> {
+type Options = { fromName?: string; toName?: string; signal?: AbortSignal };
+
+export async function fetchPlans(from: string, to: string, { fromName, toName, signal }: Options = {}): Promise<Plan[]> {
   const params = new URLSearchParams({ from, to });
-  const res = await fetch(`/api/plan?${params}`, { signal, headers: { accept: "application/json" } });
+  if (fromName) params.set("fromName", fromName);
+  if (toName) params.set("toName", toName);
+  const res = await fetch(`/api/plans?${params}`, { signal, headers: { accept: "application/json" } });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error ?? `HTTP ${res.status}`);
   }
-  return res.json();
+  const body = await res.json();
+  return Array.isArray(body.plans) ? body.plans : [];
 }

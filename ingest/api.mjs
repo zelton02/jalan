@@ -15,7 +15,7 @@ import { createServer } from "node:http";
 import { statSync } from "node:fs";
 import { resolve } from "node:path";
 import { openDb, metaMap } from "./lib.mjs";
-import { buildIndex, planJourney } from "./router.mjs";
+import { buildIndex, planJourney, planAlternatives } from "./router.mjs";
 import { geocode } from "./geocode.mjs";
 
 const argv = process.argv.slice(2);
@@ -73,44 +73,57 @@ const DEFAULT_FROM = { lat: 3.041707, lon: 101.80142, name: "Sungai Long" };
 const DEFAULT_TO = { lat: 3.13442, lon: 101.68625, name: "KL Sentral" };
 
 /** "3.04,101.80" is used as-is; anything else goes through the cached geocoder. */
-async function resolvePlace(value, fallback) {
+async function resolvePlace(value, fallback, nameOverride) {
   if (!value) return fallback;
   const text = value.trim();
   const coords = /^(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)$/.exec(text);
-  if (coords) return { lat: Number(coords[1]), lon: Number(coords[2]), name: text };
+  if (coords) return { lat: Number(coords[1]), lon: Number(coords[2]), name: nameOverride || text };
 
   const key = text.toLowerCase();
-  if (placeCache.has(key)) return placeCache.get(key);
+  if (placeCache.has(key)) {
+    const hit = placeCache.get(key);
+    return nameOverride ? { ...hit, name: nameOverride } : hit;
+  }
   const hit = await geocode(text);
   if (!hit) return null;
   const place = { lat: hit.lat, lon: hit.lon, name: hit.name };
   placeCache.set(key, place);
-  return place;
+  return nameOverride ? { ...place, name: nameOverride } : place;
 }
 
-async function handlePlan(url, res) {
-  const from = await resolvePlace(url.searchParams.get("from"), DEFAULT_FROM);
-  const to = await resolvePlace(url.searchParams.get("to"), DEFAULT_TO);
+async function handlePlan(url, res, mode = "plan") {
+  const from = await resolvePlace(url.searchParams.get("from"), DEFAULT_FROM, url.searchParams.get("fromName"));
+  const to = await resolvePlace(url.searchParams.get("to"), DEFAULT_TO, url.searchParams.get("toName"));
   if (!from) return json(res, 404, { error: "Lokasi asal tidak dijumpai. / Origin not found." });
   if (!to) return json(res, 404, { error: "Destinasi tidak dijumpai. / Destination not found." });
 
   const requestedAt = parseHHMM(url.searchParams.get("at") ?? atArg);
   const atSec = requestedAt ?? pinned ?? undefined;
   const rounds = Math.min(5, Math.max(1, Number(url.searchParams.get("rounds") ?? 3) || 3));
+  const count = Math.min(3, Math.max(1, Number(url.searchParams.get("count") ?? 3) || 3));
 
-  const key = `${from.lat},${from.lon}|${to.lat},${to.lon}|${atSec ?? "live"}|${rounds}|${dbMtime}`;
+  const key = `${mode}|${from.lat},${from.lon}|${to.lat},${to.lon}|${atSec ?? "live"}|${rounds}|${mode === "plans" ? count : 1}|${dbMtime}`;
   const cached = planCache.get(key);
   // A live plan goes stale within minutes; only a pinned clock is safe to keep.
   const fresh = cached && (atSec != null || Date.now() - cached.at < 30_000);
   if (fresh) return json(res, 200, cached.payload);
 
-  const plan = withDb((current) => planJourney(current, { from, to, atSec, maxRounds: rounds, index }));
-  if (!plan) {
+  let plans;
+  if (mode === "plans") {
+    plans = withDb((current) => planAlternatives(
+      current, { from, to, atSec, maxRounds: rounds, index }, { count }
+    ));
+  } else {
+    const one = withDb((current) => planJourney(current, { from, to, atSec, maxRounds: rounds, index }));
+    plans = one ? [one] : [];
+  }
+  if (!plans.length) {
     return json(res, 404, { error: "Tiada laluan pada waktu ini. / No route at this time." });
   }
 
-  const { _debug, ...clean } = plan;
-  const payload = { ...clean, clock: requestedAt != null || pinned != null ? `pinned ${atArg ?? url.searchParams.get("at")}` : "live" };
+  const clock = requestedAt != null || pinned != null ? `pinned ${atArg ?? url.searchParams.get("at")}` : "live";
+  const clean = plans.map(({ _debug, ...rest }) => rest);
+  const payload = mode === "plans" ? { plans: clean, clock } : { ...clean[0], clock };
   planCache.set(key, { payload, at: Date.now() });
   if (planCache.size > 200) planCache.delete(planCache.keys().next().value);
   json(res, 200, payload);
@@ -135,7 +148,8 @@ createServer(async (req, res) => {
         stops: index.stops.length,
       });
     }
-    if (url.pathname === "/api/plan") return await handlePlan(url, res);
+    if (url.pathname === "/api/plan") return await handlePlan(url, res, "plan");
+    if (url.pathname === "/api/plans") return await handlePlan(url, res, "plans");
     json(res, 404, { error: "not found" });
   } catch (error) {
     console.error("[api]", error);

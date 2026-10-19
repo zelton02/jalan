@@ -228,7 +228,7 @@ function earliestDeparture(entry, idx, boardSec) {
  * @param opts.atSec     departure time in seconds (defaults to now, KL)
  * @param opts.maxRounds vehicles allowed (1 = direct, 2 = one transfer, ...)
  */
-export function planJourney(db, { from, to, atSec, maxRounds = 3, index }) {
+export function planJourney(db, { from, to, atSec, maxRounds = 3, index, bannedFirstPatterns }) {
   const idx = index ?? buildIndex(db);
   const now = atSec ?? klNow().seconds;
   const kl = klNow();
@@ -243,6 +243,7 @@ export function planJourney(db, { from, to, atSec, maxRounds = 3, index }) {
     const startSec = now + date.dayOffset;
     const result = runRaptor(db, idx, {
       from, to, startSec, maxRounds, ymd: date.ymd, weekday: date.weekday, dayOffset: date.dayOffset,
+      banned: bannedFirstPatterns,
     });
     // Compare numeric arrivals; "00:10" sorts after "23:50" as a string.
     if (result && (!best || result._arrive < best._arrive)) best = result;
@@ -251,7 +252,42 @@ export function planJourney(db, { from, to, atSec, maxRounds = 3, index }) {
   return best;
 }
 
-function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, dayOffset }) {
+/**
+ * Up to `count` itineraries, each forced to start on a different first vehicle.
+ * Alternatives that arrive more than `maxExtraMinutes` later than the best are dropped.
+ */
+export function planAlternatives(db, opts, { count = 3, maxExtraMinutes = 45 } = {}) {
+  const index = opts.index ?? buildIndex(db);
+  const plans = [];
+  const banned = new Set();
+
+  for (let i = 0; i < count; i++) {
+    const plan = planJourney(db, { ...opts, index, bannedFirstPatterns: banned });
+    if (!plan) break;
+
+    const signature = plan.legs
+      .filter((leg) => leg.kind === "ride")
+      .map((leg) => `${leg.route}|${leg.from}|${leg.to}`)
+      .join(">");
+    if (plans.some((p) => p._signature === signature)) break;
+    plan._signature = signature;
+    plans.push(plan);
+
+    const first = plan._debug.rides[0]?.patternId;
+    if (first == null || banned.has(first)) break;
+    banned.add(first);
+  }
+
+  const best = plans[0];
+  return plans
+    .filter((plan, i) => i === 0 || plan.total_minutes - best.total_minutes <= maxExtraMinutes)
+    .map((plan) => {
+      delete plan._signature;
+      return plan;
+    });
+}
+
+function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, dayOffset, banned }) {
   const ctx = makeContext(db, index, ymd, weekday);
   const labels = new Map();
   const directM = haversineM(from, to);
@@ -289,6 +325,7 @@ function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, day
       const boardSec = label.arr + (round > 1 ? TRANSFER_PENALTY_SEC : 0);
 
       for (const { pattern, idx } of at) {
+        if (banned?.has(pattern.id)) continue;
         const entry = ctx.byId.get(pattern.id);
         if (!entry) continue;
         const best = earliestDeparture(entry, idx, boardSec);
@@ -376,11 +413,13 @@ function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, day
   chain.reverse();
 
   const legs = [];
+  let lastRide = null;
   for (const node of chain) {
     const p = node.parent;
     if (!p) continue;
     const start = p.type === "ride" ? p.dep : node.arr - p.secs;
     if (p.type === "walk") {
+      lastRide = null;
       legs.push({
         kind: "walk",
         start: hhmm(start - dayOffset),
@@ -389,6 +428,7 @@ function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, day
         subtitle: `${p.to.name} · ${Math.round(p.meters)} m`,
       });
     } else if (p.type === "foot") {
+      lastRide = null;
       legs.push({
         kind: "transfer",
         start: hhmm(start - dayOffset),
@@ -397,31 +437,53 @@ function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, day
         subtitle: `${p.to.name} · ${Math.round(p.meters)} m`,
       });
     } else if (p.type === "ride") {
-      const label = p.pattern.route?.short_name || p.pattern.route?.long_name || p.pattern.routeId;
+      const routeLabel = p.pattern.route?.short_name || p.pattern.route?.long_name || p.pattern.routeId;
       const stations = [];
       for (let j = p.fromIdx; j <= p.toIdx; j++) {
         const name = index.byKey.get(p.pattern.stopKeys[j])?.name ?? p.pattern.stopIds[j];
         const rel = j === p.fromIdx ? p.pattern.relDep[j] : p.pattern.relArr[j];
         stations.push({ name, time: hhmm(p.T + rel - dayOffset) });
       }
-      legs.push({
+
+      // The same route can be split into two trips at a terminal (loop services do
+      // this constantly). If the rider stays on the same line at the same stop, show
+      // one leg with the wait, not two "board" steps.
+      const gap = lastRide ? p.dep - lastRide.arr : Infinity;
+      if (lastRide && lastRide.route === routeLabel && lastRide.to === stations[0].name && gap >= 0 && gap <= 15 * 60) {
+        const leg = lastRide.leg;
+        leg.stations.push(...stations.slice(1));
+        leg.duration = `${Math.max(1, Math.round((p.arr - lastRide.dep) / 60))} min`;
+        leg.title = `${routeLabel} ke ${stations[stations.length - 1].name}`;
+        leg.to = stations[stations.length - 1].name;
+        if (gap >= 60) leg.subtitle = `Sambung di ${stations[0].name} · tunggu ${Math.round(gap / 60)} min`;
+        lastRide.arr = p.arr;
+        lastRide.to = leg.to;
+        continue;
+      }
+
+      const leg = {
         kind: "ride",
         start: hhmm(p.dep - dayOffset),
         duration: `${Math.max(1, Math.round((p.arr - p.dep) / 60))} min`,
-        title: `${label} ke ${stations[stations.length - 1].name}`,
+        title: `${routeLabel} ke ${stations[stations.length - 1].name}`,
         line: lineIdFor(p.pattern.feed, p.pattern.routeId),
-        route: label,
+        route: routeLabel,
         stations,
         headsign: p.pattern.headsign ?? undefined,
         tripId: p.tripId,
         from: stations[0].name,
         to: stations[stations.length - 1].name,
-      });
+      };
+      legs.push(leg);
+      lastRide = { leg, route: routeLabel, to: leg.to, arr: p.arr, dep: p.dep };
     }
   }
 
   const depart = hhmm(startSec - dayOffset);
   const arrive = hhmm(target.arrive - dayOffset);
+  // Match the clock labels: both ends are floored to the minute when displayed, so the
+  // duration must be their difference or "13:34 → 14:31" reads 57 while the chip says 56.
+  const totalMinutes = Math.max(1, Math.floor(target.arrive / 60) - Math.floor(startSec / 60));
   const lastArrival = chain.length ? chain[chain.length - 1].arr : startSec;
   if (target.walkSec >= 30) {
     legs.push({
@@ -445,7 +507,7 @@ function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, day
     destination: to.name ?? `${to.lat.toFixed(4)},${to.lon.toFixed(4)}`,
     depart,
     arrive,
-    total_minutes: Math.round((target.arrive - startSec) / 60),
+    total_minutes: totalMinutes,
     source: { feed: "router", ingested_at: metaMap(db)["rail:ingested_at"] ?? null },
     legs,
     _arrive: target.arrive,
@@ -455,6 +517,7 @@ function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, day
       stats: ctx.stats,
       rides: chain.filter((n) => n.parent?.type === "ride").map((n) => ({
         round: n.round,
+        patternId: n.parent.pattern.id,
         tripId: n.parent.tripId,
         routeId: n.parent.pattern.routeId,
         dep: hhmm(n.parent.dep - dayOffset),

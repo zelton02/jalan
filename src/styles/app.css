@@ -119,6 +119,10 @@ button {
   cursor: pointer;
 }
 
+.locate {
+  margin-bottom: var(--space-4);
+}
+
 .btn {
   display: inline-flex;
   align-items: center;

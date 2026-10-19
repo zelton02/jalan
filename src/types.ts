@@ -11,6 +11,10 @@ export type PlanLeg = {
   line?: LineId;
   stations?: Station[];
   headsign?: string;
+  route?: string;
+  tripId?: string;
+  from?: string;
+  to?: string;
 };
 
 export type Plan = {

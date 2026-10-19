@@ -21,6 +21,11 @@ changes, not when plans are made (plans belong in `BACKLOG.md`).
 - `/api/plan?from=&to=&at=&rounds=` accepts an address (Nominatim, cached, 1 req/s) or `lat,lon`.
   With no params it plans the Sungai Long residence → KL Sentral.
 - The UI searches any Malaysian address; the corridor gate is gone.
+- `/api/plans` returns up to 3 itineraries, each forced to start on a different first vehicle;
+  the results screen lists them with Tercepat / Alternatif tags.
+- “Use my location” fills the origin with `lat,lon` and labels it “Lokasi saya”.
+- The same route split across two trips at a terminal is shown as one leg with
+  “Sambung di … · tunggu N min” instead of two board steps.
 - 08:00 home → KL Sentral: **57 min** via 590 + LRT (beats the old MRT corridor).
 - Bukit Dukung MRT → KL Sentral: **53 min**, reproducing the old corridor exactly
   (KGL 08:03→08:45, KJL 08:50→08:53).
@@ -28,15 +33,14 @@ changes, not when plans are made (plans belong in `BACKLOG.md`).
 
 ## Next task
 
-Pick one, in this order of value:
+Pick one:
 
-1. **UI**: “use my location” + a saved home chip; merge consecutive legs on the same route (the
-   590 terminates at UTAR and the rider waits for the next 590); show 2–3 alternatives instead of
-   one. The engine currently returns only the earliest-arrival itinerary.
-2. **Cross-state connection quality**: the ETS reaches Bukit Mertajam 11:57 and CT14 leaves 16:54.
+1. **Cross-state connection quality**: the ETS reaches Bukit Mertajam 11:57 and CT14 leaves 16:54.
    Check whether Butterworth + ferry is better, or whether the Penang feed simply lacks trips.
-3. **Realtime**: bus vehicle positions exist; rail returns 404. Keep positions schedule-derived
+2. **Realtime**: bus vehicle positions exist; rail returns 404. Keep positions schedule-derived
    until a feed is verified.
+3. **Saved places**: the “recent” list on the search screen is static copy. Wire it to
+   localStorage and add a home chip.
 
 ## Known gaps
 
