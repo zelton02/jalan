@@ -127,6 +127,21 @@ promise for the specific trip**, and the UI says so. Rail has no realtime at all
 
 `npm run live -- --route U5900` prints the vehicles behind the number.
 
+### History aggregation
+
+`ingest/punctuality.mjs` replays `vp` through the same estimator and answers “how late is this
+route at 08:00”:
+
+- samples are collapsed into one median per **vehicle per 10 minutes**, then the hour's median is
+  taken over those buckets. `n` counts buckets, not raw rows — 60 rows a minute from one bus are
+  one observation, not sixty.
+- the API returns p25/p75 as well as the median, because a median of +3 hiding a p75 of +12 is a
+  different promise than a tight ±2.
+- the window is `days` (default 14) but `days_covered` reports what actually exists. As of
+  2026-10-19 the collector has one day, so the numbers are a pipeline test, not a reliability
+  statement.
+- rail has no realtime samples, so rail routes have no history at all.
+
 Why collect before there is a feature: the official feeds only expose *now*. Headways, bunching and
 travel times can only be measured from history, and history cannot be backfilled. Feeds sampled:
 `rapid-bus-kl`, `rapid-bus-mrtfeeder`, `ktmb`. Rail is absent upstream (see above), so nothing is

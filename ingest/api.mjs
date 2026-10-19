@@ -10,6 +10,7 @@
  *   GET /api/stops?q=UTAR                 -> stop search for the board
  *   GET /api/departures?stop=bus|1000383  -> next departures at a stop
  *   GET /api/live?route=U5900             -> vehicles + inferred delay
+ *   GET /api/punctuality?route=U5900      -> median delay by hour from history
  *   GET /api/plan                        -> Sungai Long -> KL Sentral (default demo trip)
  *   GET /api/plan?from=Sungai+Long&to=KL+Sentral
  *   GET /api/plan?from=3.04,101.80&to=3.13,101.68&at=08:00&rounds=3
@@ -22,6 +23,7 @@ import { buildIndex, planJourney, planAlternatives } from "./router.mjs";
 import { geocode } from "./geocode.mjs";
 import { liveStatus } from "./live.mjs";
 import { searchStops, nextDepartures } from "./board.mjs";
+import { routePunctuality } from "./punctuality.mjs";
 
 const argv = process.argv.slice(2);
 const atIdx = argv.indexOf("--at");
@@ -311,6 +313,14 @@ createServer(async (req, res) => {
         updated_at: live.updated_at,
         departures,
       });
+    }
+    if (url.pathname === "/api/punctuality") {
+      const route = url.searchParams.get("route");
+      if (!route) return json(res, 400, { error: "route diperlukan. / route is required." });
+      const days = Math.min(60, Math.max(1, Number(url.searchParams.get("days") ?? 14) || 14));
+      const data = routePunctuality(route, { days });
+      // No history yet is a normal answer for an optional enrichment, not a 404.
+      return json(res, 200, { ...data, available: Boolean(data.samples) });
     }
     if (url.pathname === "/api/plan") return await handlePlan(url, res, "plan");
     if (url.pathname === "/api/plans") return await handlePlan(url, res, "plans");

@@ -484,6 +484,7 @@ function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, day
         line: lineIdFor(p.pattern.feed, p.pattern.routeId),
         route: routeLabel,
         routeId: p.pattern.routeId,
+        feed: p.pattern.feed,
         stations,
         headsign: p.pattern.headsign ?? undefined,
         tripId: p.tripId,

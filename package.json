@@ -16,6 +16,7 @@
     "patterns": "node --no-warnings ingest/patterns.mjs",
     "live": "node --no-warnings ingest/live.mjs",
     "board": "node --no-warnings ingest/board.mjs",
+    "punctual": "node --no-warnings ingest/punctuality.mjs",
     "ui:smoke": "node --no-warnings scripts/ui-smoke.mjs"
   },
   "dependencies": {

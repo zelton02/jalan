@@ -27,14 +27,55 @@ const liveLabel = (live: Live) => {
   return `${delay} · ${live.vehicles} ${live.feed === "ktmb" ? "tren" : "bas"}`;
 };
 
+type HourStat = { hour: number; n: number; median: number; p25: number; p75: number };
+const signed = (minutes: number) => (minutes === 0 ? "0" : `${minutes > 0 ? "+" : "−"}${Math.abs(minutes)}`);
+
 export default function Journey({ plan, onBack }: { plan: Plan; onBack: () => void }) {
   const [open, setOpen] = useState<number | null>(null);
   const [now, setNow] = useState(klHM);
+  const [punct, setPunct] = useState<Record<string, HourStat[]>>({});
+  const [punctDays, setPunctDays] = useState(0);
 
   useEffect(() => {
     const id = setInterval(() => setNow(klHM()), 30_000);
     return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    const routes = [
+      ...new Set(
+        plan.legs
+          .filter((leg) => leg.routeId && leg.feed !== "rail")
+          .map((leg) => leg.routeId as string),
+      ),
+    ];
+    if (!routes.length) return;
+    let alive = true;
+    (async () => {
+      const next: Record<string, HourStat[]> = {};
+      let days = 0;
+      await Promise.all(
+        routes.map(async (route) => {
+          try {
+            const res = await fetch(`/api/punctuality?route=${encodeURIComponent(route)}&days=14`);
+            if (!res.ok) return;
+            const body = await res.json();
+            next[route] = body.hours ?? [];
+            days = Math.max(days, body.days_covered ?? 0);
+          } catch {
+            /* history is optional */
+          }
+        }),
+      );
+      if (alive) {
+        setPunct(next);
+        setPunctDays(days);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [plan]);
 
   const next = plan.legs[0];
   const offline = typeof navigator !== "undefined" && !navigator.onLine;
@@ -80,6 +121,16 @@ export default function Journey({ plan, onBack }: { plan: Plan; onBack: () => vo
                     LIVE {liveLabel(leg.live)}
                   </div>
                 ) : null}
+                {leg.routeId && (() => {
+                  const hour = Number(leg.start.slice(0, 2));
+                  const stat = punct[leg.routeId]?.find((h) => h.hour === hour);
+                  if (!stat || stat.n < 8) return null;
+                  return (
+                    <div className="step__hist" title="Median sejarah pada jam ini. / Historical median at this hour.">
+                      BIASA {signed(stat.median)}′ · {stat.n} SAMPEL
+                    </div>
+                  );
+                })()}
                 <div className="step__meta">
                   {leg.line ? <LineBadge line={leg.line} short={lineShort[leg.line]} /> : null}
                   {leg.duration ? <span>{leg.duration}</span> : null}
@@ -118,10 +169,11 @@ export default function Journey({ plan, onBack }: { plan: Plan; onBack: () => vo
         })}
       </ol>
 
-      {plan.legs.some((leg) => leg.live) ? (
+      {plan.legs.some((leg) => leg.live) || punctDays > 0 ? (
         <p className="footnote">
-          LIVE: anggaran dari kenderaan di laluan ini sekarang, bukan trip ini. / Estimated from
-          vehicles on the route now, not this trip.
+          LIVE: anggaran dari kenderaan di laluan ini sekarang, bukan trip ini. BIASA: median
+          sejarah {punctDays} hari pada jam itu. / LIVE is a route estimate; BIASA is the historical
+          median at that hour.
         </p>
       ) : null}
 

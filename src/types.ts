@@ -13,6 +13,7 @@ export type PlanLeg = {
   headsign?: string;
   route?: string;
   routeId?: string;
+  feed?: string;
   tripId?: string;
   from?: string;
   to?: string;

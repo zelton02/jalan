@@ -36,6 +36,7 @@ npm run route -- --from 3.0417,101.8014 --to 3.1344,101.6863 --date 2026-10-21 -
 npm run live -- --route U5900                     # live vehicles + inferred delay
 npm run board -- --q UTAR                         # find stops
 npm run board -- --stop "bus|1004189"             # next departures at a stop
+npm run punctual -- --route U5900                 # median delay by hour from history
 ```
 
 The router (round-based RAPTOR over precomputed patterns) plans any A→B point. `npm run ingest`

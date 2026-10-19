@@ -35,6 +35,10 @@ changes, not when plans are made (plans belong in `BACKLOG.md`).
   “UTAR” beats “CYBERJAYA UTARA”); `/api/departures?stop=bus|1004189` expands every frequency
   window into actual runs, drops patterns where the stop is the terminus, and shows route,
   destination, countdown and scheduled time. The “Jadual hentian” screen polls every 30 s.
+- History: `/api/punctuality?route=U5900` returns median delay per hour (p25/p75 and the bucket
+  count) from the collected positions. The Journey screen shows “BIASA +1′ · 15 SAMPEL” under the
+  leg when the hour has at least 8 buckets; the footnote states how many days of history exist.
+  As of 2026-10-19 that is **1 day** — treat it as a pipeline that improves, not a verdict.
 - The UI searches any Malaysian address; the corridor gate is gone.
 - `/api/plans` returns up to 3 itineraries, each forced to start on a different first vehicle;
   the results screen lists them with Tercepat / Alternatif tags.
@@ -50,8 +54,9 @@ changes, not when plans are made (plans belong in `BACKLOG.md`).
 
 Pick one:
 
-1. **Realtime history**: the collector has been sampling since 2026-10-18. Use it for “this route is
-   usually +6 min at 08:00” (median by route × hour), which is steadier than one live snapshot.
+1. **History depth**: only one day is collected so far; the hourly median becomes meaningful at
+   ~2 weeks. Meanwhile add a day-of-week split and surface p25/p75 as “biasa 1–7 min”, not a
+   single number.
 2. **Saved places / HTTPS**: the “recent” list is static copy; geolocation needs HTTPS to work on a
    phone. Both are small, both make the app usable daily.
 3. **Cross-state connection quality**: the ETS reaches Bukit Mertajam 11:57 and CT14 leaves 16:54.
