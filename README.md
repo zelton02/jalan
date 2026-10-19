@@ -59,6 +59,7 @@ npm run dev
 npm run audit    # token drift check
 npm run build
 npm run deploy   # build + rsync dist/ to /var/www/jalan (production)
+npm run walk:build  # rebuild the OSRM foot graph and restart osrm-foot
 ```
 
 ## Deploy
@@ -75,6 +76,23 @@ The Caddyfile lives in [`deploy/Caddyfile`](./deploy/Caddyfile). Copy it to `/et
 and run `systemctl reload caddy` after editing. HTTPS also matters for the app itself: browsers
 only allow `navigator.geolocation` in a secure context, so “Use my location” works on
 `https://zhng.tech` and fails on a plain `http://` IP.
+
+## Walking
+
+The first and last mile uses a self-hosted OSRM foot graph (OpenStreetMap), not a straight line:
+
+```bash
+npm run walk:build   # Malaysia extract -> Klang Valley -> osrm-foot on 127.0.0.1:5000
+```
+
+`ingest/walk.mjs` asks OSRM for two matrices per plan (origin→stops, destination→stops). If the
+container is down or a pair is unroutable, the router falls back to straight-line × 1.3, so the
+app keeps working without it.
+
+Station access is separate: `STATION_WALK_SEC` in `router.mjs` holds the street-to-platform time
+for the big interchanges (KL Sentral 10 min, Bandar Tasik Selatan 7 min, …) with 2 min as the
+rail default. Without it, a stop at the station door measured 0 m and the plan claimed a 1-minute
+boarding.
 
 ## Data
 

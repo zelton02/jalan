@@ -42,6 +42,11 @@ changes, not when plans are made (plans belong in `BACKLOG.md`).
 - Production is `https://zhng.tech` (Caddy + Let's Encrypt behind Cloudflare). The search screen has
   a star on each field: it saves the current value as Rumah / Kerja in localStorage, chips fill
   them back, and the last five successful searches appear under BARU-BARU / RECENT.
+- Realism pass (2026-10-19): OSRM foot walking for the first/last mile, station access times for
+  big interchanges, mode-aware transfer penalties, and a 90 s boarding buffer. Same five routes vs
+  Google at 17:00: Mid Valley 23 vs 31, 1 Utama 43 vs 52, Bukit Dukung→KLCC 64 vs 66,
+  Home→KLCC 66 vs 73. Home→KL Sentral is still 58 vs Google's best 78 (we take 590 + 750, Google
+  prefers T453 + KGL).
 - The UI searches any Malaysian address; the corridor gate is gone.
 - `/api/plans` returns up to 3 itineraries, each forced to start on a different first vehicle;
   the results screen lists them with Tercepat / Alternatif tags.
@@ -62,9 +67,9 @@ Pick one:
    single number.
 2. **Cross-state connection quality**: the ETS reaches Bukit Mertajam 11:57 and CT14 leaves 16:54.
    Check whether Butterworth + ferry is better, or whether the Penang feed simply lacks trips.
-3. **Walking quality**: access legs are straight-line × 1.3, which can route someone across a
-   highway. Replace the detour constant with a real footpath graph (OSRM/Valhalla) for the first
-   and last 800 m, where it actually changes the answer.
+3. **Calibrate the realism table**: the station walk minutes were set from one comparison, not
+   from measurements. Log a few real trips and adjust the big interchanges; add stations as they
+   show up in failed comparisons.
 
 ## Known gaps
 

@@ -18,6 +18,7 @@
     "board": "node --no-warnings ingest/board.mjs",
     "punctual": "node --no-warnings ingest/punctuality.mjs",
     "deploy": "npm run build && rsync -a --delete dist/ /var/www/jalan/",
+    "walk:build": "bash scripts/build-walk.sh",
     "ui:smoke": "node --no-warnings scripts/ui-smoke.mjs"
   },
   "dependencies": {

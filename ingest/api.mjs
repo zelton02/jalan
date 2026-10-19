@@ -19,8 +19,9 @@ import { createServer } from "node:http";
 import { statSync } from "node:fs";
 import { resolve } from "node:path";
 import { openDb, metaMap, klNow, ymdInfo, hhmm } from "./lib.mjs";
-import { buildIndex, planJourney, planAlternatives } from "./router.mjs";
+import { buildIndex, planJourney, planAlternatives, ACCESS_RADIUS_M } from "./router.mjs";
 import { geocode } from "./geocode.mjs";
+import { walkMatrix } from "./walk.mjs";
 import { liveStatus } from "./live.mjs";
 import { searchStops, nextDepartures } from "./board.mjs";
 import { routePunctuality } from "./punctuality.mjs";
@@ -212,12 +213,18 @@ async function handlePlan(url, res, mode = "plan") {
   if (fresh) return json(res, 200, withLive(cached.payload));
 
   let plans;
+  freshen();
+  // Real footpaths for the first and last mile. Two matrix calls; an empty map means OSRM is
+  // down and the router falls back to straight-line x 1.3.
+  const originWalks = await walkMatrix(from, index.near(from.lat, from.lon, ACCESS_RADIUS_M).map((o) => o.stop));
+  const destWalks = await walkMatrix(to, index.near(to.lat, to.lon, ACCESS_RADIUS_M).map((o) => o.stop));
+
   if (mode === "plans") {
     plans = withDb((current) => planAlternatives(
-      current, { from, to, atSec, date: when.date, maxRounds: rounds, index }, { count }
+      current, { from, to, atSec, date: when.date, maxRounds: rounds, index, originWalks, destWalks }, { count }
     ));
   } else {
-    const one = withDb((current) => planJourney(current, { from, to, atSec, date: when.date, maxRounds: rounds, index }));
+    const one = withDb((current) => planJourney(current, { from, to, atSec, date: when.date, maxRounds: rounds, index, originWalks, destWalks }));
     plans = one ? [one] : [];
   }
   if (!plans.length) {
