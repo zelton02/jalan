@@ -89,10 +89,11 @@ npm run walk:build   # Malaysia extract -> Klang Valley -> osrm-foot on 127.0.0.
 container is down or a pair is unroutable, the router falls back to straight-line × 1.3, so the
 app keeps working without it.
 
-Station access is separate: `STATION_WALK_SEC` in `router.mjs` holds the street-to-platform time
-for the big interchanges (KL Sentral 10 min, Bandar Tasik Selatan 7 min, …) with 2 min as the
-rail default. Without it, a stop at the station door measured 0 m and the plan claimed a 1-minute
-boarding.
+Station access is separate: [`config/station-walks.json`](./config/station-walks.json) holds the
+street-to-platform seconds for the big interchanges (KL Sentral 10 min, Bandar Tasik Selatan
+7 min, …), the rail default, the transfer buffers and the boarding buffer. Edit the file and save
+— the API re-reads it on the next plan (mtime check), no restart or deploy. Only KL Sentral is
+calibrated; the rest are estimates, marked `"source": "guess"`.
 
 ## Data
 

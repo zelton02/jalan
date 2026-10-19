@@ -7,6 +7,8 @@
 //
 // The response keeps the same leg shape as lib.planDoorToDoor so the client does
 // not change when the engine is swapped.
+import { statSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { activeServices, dayBefore, klNow, hhmm, metaMap, ymdInfo } from "./lib.mjs";
 
 const WALK_SPEED_M_MIN = 75;   // fallback pace when the foot router is unavailable
@@ -15,58 +17,64 @@ export const ACCESS_RADIUS_M = 1200;   // how far we let the rider walk to/from 
 const TRANSFER_RADIUS_M = 350;         // stop-to-stop footpath for transfers
 const SERVICE_DAY_CUTOFF = 4 * 3600;   // GTFS service day rolls at 04:00 local
 
-// Minimum time between reaching a stop and the vehicle leaving. The old code only applied a
-// penalty on transfers, so a walk that ended the same minute as a departure counted as a catch.
-const BOARD_BUFFER_SEC = 90;
-const TRANSFER_BASE_SEC = 120;         // same-mode change (platform to platform)
-const TRANSFER_MODE_SEC = 240;         // bus <-> rail, usually a different building
-const RAIL_FEEDS = new Set(["rail", "ktmb"]);
+// Tuneable, measured-or-guessed times live in config/station-walks.json. The values below are
+// the fallback when the file is missing or a station is not listed. The file is re-read when it
+// changes, so editing it takes effect on the next plan without a restart.
+const WALK_CONFIG_PATH = resolve("config/station-walks.json");
+const WALK_DEFAULTS = {
+  rail_default_sec: 120,
+  board_buffer_sec: 90,
+  transfer: { same_mode_sec: 120, mode_change_sec: 240, rail_extra_sec: 30 },
+  stations: {},
+};
+let walkConfig = { mtime: 0, data: WALK_DEFAULTS };
 
-// Street to platform. GTFS puts a station on one coordinate, so a stop at the station door
-// measured 0 m and the planner claimed you could board in one minute. These are the walking
-// minutes inside each station, from the entrance to the platform.
-const STATION_WALK_SEC = new Map([
-  ["rail|KJ15", 600],  // KL Sentral
-  ["ktmb|19100", 540], // KL Sentral (KTM side)
-  ["rail|SP15", 420],  // Bandar Tasik Selatan
-  ["rail|AG3", 300], ["rail|SP3", 300], ["rail|PY17", 300], ["rail|MR11", 300], // Titiwangsa
-  ["rail|AG7", 240], ["rail|KJ13", 240], ["rail|SP7", 240],   // Masjid Jamek
-  ["rail|KG18A", 240], ["rail|MR6", 240],                     // Bukit Bintang
-  ["rail|AG13", 240], ["rail|KG22", 240],                     // Maluri
-  ["rail|AG11", 240], ["rail|SP11", 240], ["rail|PY24", 240], // Chan Sow Lin
-  ["rail|KJ14", 180], ["rail|KG16", 180],                     // Pasar Seni
-  ["rail|KJ10", 180],                                         // KLCC
-  ["rail|KJ17", 180], ["ktmb|52700", 180],                    // Abdullah Hukum
-]);
-const STATION_WALK_DEFAULT_RAIL = 120;
+export function refreshWalkConfig() {
+  try {
+    const mtime = statSync(WALK_CONFIG_PATH).mtimeMs;
+    if (mtime === walkConfig.mtime) return walkConfig.data;
+    const parsed = JSON.parse(readFileSync(WALK_CONFIG_PATH, "utf8"));
+    walkConfig = {
+      mtime,
+      data: {
+        ...WALK_DEFAULTS,
+        ...parsed,
+        transfer: { ...WALK_DEFAULTS.transfer, ...(parsed.transfer ?? {}) },
+        stations: parsed.stations ?? {},
+      },
+    };
+  } catch {
+    // keep the last good config (or the defaults) when the file is absent or malformed
+  }
+  return walkConfig.data;
+}
 
-// Extra time to change platforms inside a large interchange, on top of the mode penalty.
-const TRANSFER_EXTRA_SEC = new Map([
-  ["rail|KJ15", 180], ["ktmb|19100", 180],
-  ["rail|SP15", 120], ["rail|PY17", 120], ["rail|AG3", 120],
-  ["rail|AG7", 120], ["rail|KJ13", 120],
-  ["rail|KG18A", 90], ["rail|AG13", 90], ["rail|AG11", 90],
-]);
+const railFeeds = ["rail", "ktmb"];
 
-/** Walking time from the street to the platform (and back out). */
+/** Street to platform, and back out. Keys: "<feed>|<stop_id>". */
 export function stationWalkSec(stop) {
   if (!stop) return 0;
-  const exact = STATION_WALK_SEC.get(stop.key);
-  if (exact != null) return exact;
-  return RAIL_FEEDS.has(stop.feed) ? STATION_WALK_DEFAULT_RAIL : 0;
+  const cfg = walkConfig.data;
+  const entry = cfg.stations[stop.key];
+  const value = entry == null ? null : typeof entry === "number" ? entry : entry.walk_sec;
+  if (value != null) return value;
+  return railFeeds.includes(stop.feed) ? cfg.rail_default_sec : 0;
 }
 
 /** Extra walking inside the interchange before you reach the next platform. */
 export function transferWalkSec(fromStop, toStop) {
-  if (!RAIL_FEEDS.has(toStop?.feed)) return 0;
-  return TRANSFER_EXTRA_SEC.get(toStop.key) ?? 30;
+  if (!toStop || !railFeeds.includes(toStop.feed)) return 0;
+  const cfg = walkConfig.data;
+  const entry = cfg.stations[toStop.key];
+  return entry?.transfer_extra_sec ?? cfg.transfer.rail_extra_sec;
 }
 
 /** Buffer between reaching the platform and boarding (mode change costs more). */
 export function transferPenaltySec(fromStop, toStop) {
-  const fromRail = RAIL_FEEDS.has(fromStop?.feed);
-  const toRail = RAIL_FEEDS.has(toStop?.feed);
-  return fromRail === toRail ? TRANSFER_BASE_SEC : TRANSFER_MODE_SEC;
+  const cfg = walkConfig.data;
+  const fromRail = railFeeds.includes(fromStop?.feed);
+  const toRail = railFeeds.includes(toStop?.feed);
+  return fromRail === toRail ? cfg.transfer.same_mode_sec : cfg.transfer.mode_change_sec;
 }
 
 
@@ -283,6 +291,7 @@ function earliestDeparture(entry, idx, boardSec) {
  * @param opts.maxRounds vehicles allowed (1 = direct, 2 = one transfer, ...)
  */
 export function planJourney(db, { from, to, atSec, date, maxRounds = 3, index, bannedFirstPatterns, originWalks, destWalks }) {
+  refreshWalkConfig();
   const idx = index ?? buildIndex(db);
   const now = atSec ?? klNow().seconds;
 
@@ -358,6 +367,7 @@ export function planAlternatives(db, opts, { count = 3, maxExtraMinutes = 45 } =
 
 function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, dayOffset, banned, originWalks, destWalks }) {
   const ctx = makeContext(db, index, ymd, weekday);
+  const boardBuffer = walkConfig.data.board_buffer_sec;
   const labels = new Map();
   const directM = haversineM(from, to);
   // Only stops near the straight line are worth expanding. A route that wanders far
@@ -379,7 +389,7 @@ function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, day
     const arr = startSec + walkSec;
     labels.set(o.stop.key, {
       stop: o.stop, arr, round: 0,
-      boardPenalty: BOARD_BUFFER_SEC,
+      boardPenalty: boardBuffer,
       parent: { type: "walk", prev: null, to: o.stop, meters: routed?.m ?? o.meters, secs: walkSec },
     });
   }
@@ -394,7 +404,7 @@ function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, day
     for (const label of frontier) {
       const at = index.patternsAtStop.get(label.stop.key);
       if (!at) continue;
-      const boardSec = label.arr + (label.boardPenalty ?? BOARD_BUFFER_SEC);
+      const boardSec = label.arr + (label.boardPenalty ?? boardBuffer);
 
       for (const { pattern, idx } of at) {
         if (banned?.has(pattern.id)) continue;
@@ -451,7 +461,7 @@ function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, day
         if (current && current.arr <= arr) continue;
         const next = {
           stop: nb.stop, arr, round,
-          boardPenalty: BOARD_BUFFER_SEC + transferPenaltySec(label.stop, nb.stop),
+          boardPenalty: boardBuffer + transferPenaltySec(label.stop, nb.stop),
           parent: { type: "foot", prev: label, to: nb.stop, meters: nb.meters, secs: nb.walkSec + innerWalk },
         };
         labels.set(nb.stop.key, next);

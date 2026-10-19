@@ -1,0 +1,47 @@
+{
+  "_readme": [
+    "Street-to-platform and platform-to-platform times, in seconds.",
+    "The API re-reads this file when it changes; no restart, no deploy.",
+    "Only KL Sentral (walk_sec 600) is calibrated against an external reference.",
+    "Everything else is an estimate: change it when you measure the real walk.",
+    "station keys are '<feed>|<stop_id>' from the stops table."
+  ],
+  "rail_default_sec": 120,
+  "board_buffer_sec": 90,
+  "transfer": {
+    "same_mode_sec": 120,
+    "mode_change_sec": 240,
+    "rail_extra_sec": 30
+  },
+  "stations": {
+    "rail|KJ15": { "name": "KL Sentral", "walk_sec": 600, "transfer_extra_sec": 180, "source": "calibrated vs Google 2026-10-19" },
+    "ktmb|19100": { "name": "KL Sentral (KTM)", "walk_sec": 540, "transfer_extra_sec": 180, "source": "guess" },
+
+    "rail|SP15": { "name": "Bandar Tasik Selatan", "walk_sec": 420, "transfer_extra_sec": 120, "source": "guess" },
+
+    "rail|AG3": { "name": "Titiwangsa", "walk_sec": 300, "transfer_extra_sec": 120, "source": "guess" },
+    "rail|SP3": { "name": "Titiwangsa", "walk_sec": 300, "transfer_extra_sec": 120, "source": "guess" },
+    "rail|PY17": { "name": "Titiwangsa", "walk_sec": 300, "transfer_extra_sec": 120, "source": "guess" },
+    "rail|MR11": { "name": "Titiwangsa", "walk_sec": 300, "transfer_extra_sec": 120, "source": "guess" },
+
+    "rail|AG7": { "name": "Masjid Jamek", "walk_sec": 240, "transfer_extra_sec": 120, "source": "guess" },
+    "rail|KJ13": { "name": "Masjid Jamek", "walk_sec": 240, "transfer_extra_sec": 120, "source": "guess" },
+    "rail|SP7": { "name": "Masjid Jamek", "walk_sec": 240, "transfer_extra_sec": 120, "source": "guess" },
+
+    "rail|KG18A": { "name": "Bukit Bintang", "walk_sec": 240, "transfer_extra_sec": 90, "source": "guess" },
+    "rail|MR6": { "name": "Bukit Bintang", "walk_sec": 240, "transfer_extra_sec": 90, "source": "guess" },
+
+    "rail|AG13": { "name": "Maluri", "walk_sec": 240, "transfer_extra_sec": 90, "source": "guess" },
+    "rail|KG22": { "name": "Maluri", "walk_sec": 240, "transfer_extra_sec": 90, "source": "guess" },
+
+    "rail|AG11": { "name": "Chan Sow Lin", "walk_sec": 240, "transfer_extra_sec": 90, "source": "guess" },
+    "rail|SP11": { "name": "Chan Sow Lin", "walk_sec": 240, "transfer_extra_sec": 90, "source": "guess" },
+    "rail|PY24": { "name": "Chan Sow Lin", "walk_sec": 240, "transfer_extra_sec": 90, "source": "guess" },
+
+    "rail|KJ14": { "name": "Pasar Seni", "walk_sec": 180, "source": "guess" },
+    "rail|KG16": { "name": "Pasar Seni", "walk_sec": 180, "source": "guess" },
+    "rail|KJ10": { "name": "KLCC", "walk_sec": 180, "source": "guess" },
+    "rail|KJ17": { "name": "Abdullah Hukum", "walk_sec": 180, "source": "guess" },
+    "ktmb|52700": { "name": "Abdullah Hukum (KTM)", "walk_sec": 180, "source": "guess" }
+  }
+}

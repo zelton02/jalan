@@ -135,10 +135,11 @@ destination to every candidate stop — and the router consumes them as seconds 
 container is down the old straight-line × 1.3 estimate is used instead, so a missing service
 degrades accuracy rather than breaking plans.
 
-Station interiors are not in OSM: street-to-platform minutes are a small table in
-`ingest/router.mjs` (KL Sentral 10 min, Bandar Tasik Selatan 7 min, …). GTFS places a station on
-one coordinate, so without that table a stop at the station door measures 0 m and the plan claims
-a one-minute boarding.
+Station interiors are not in OSM: street-to-platform minutes live in
+[`config/station-walks.json`](./config/station-walks.json) (KL Sentral 10 min, Bandar Tasik
+Selatan 7 min, …), together with the transfer buffers and the boarding buffer. The router re-reads
+the file when it changes, so a measurement can be applied without a deploy. Only KL Sentral is
+calibrated against an external reference; every other entry is an estimate.
 
 ### History aggregation
 
