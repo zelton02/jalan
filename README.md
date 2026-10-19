@@ -56,6 +56,13 @@ required, light personal use).
 - **Mula / Start** on the journey screen asks for the browser's location (HTTPS only), draws a
   pulsing blue dot with an accuracy halo, and centres the map on the rider at zoom 16. It keeps
   following while the journey runs; the button becomes **Henti / Stop**.
+- **Arrival detection.** Ride legs carry `stop_dist` (metres along the shape for every stop, from
+  the boarding stop) and `length_m`. The client projects the GPS fix onto the leg's polyline,
+  turns it into a fraction of the leg, and compares that with the same fraction for each stop.
+  That survives loop services and stops that the bus passes twice. It warns at 500 m
+  (*mendekati hentian*) and 150 m (*turun sekarang*) with a beep and a vibration, then advances
+  the leg at 90 m (ride) or 35 m (walk). Fixes worse than 80 m accuracy never advance on their
+  own, and **Saya dah turun** skips the leg by hand — indoors GPS is not to be trusted.
 
 ## Data pipeline
 
@@ -105,6 +112,15 @@ Let's Encrypt certificate over HTTP-01 (the TLS-ALPN challenge never reaches thi
 
 ```bash
 npm run deploy
+```
+
+The API itself runs as a systemd service, so it survives reboots and crashes:
+
+```bash
+install -m 644 deploy/jalan-api.service /etc/systemd/system/
+systemctl daemon-reload
+systemctl enable --now jalan-api
+journalctl -u jalan-api -f
 ```
 
 The Caddyfile lives in [`deploy/Caddyfile`](./deploy/Caddyfile). Copy it to `/etc/caddy/Caddyfile`

@@ -1,0 +1,17 @@
+[Unit]
+Description=Jalan routing API
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/projects/jalan
+ExecStart=/root/.hermes/node/bin/node --no-warnings ingest/api.mjs
+Restart=always
+RestartSec=3
+User=root
+StandardOutput=append:/root/projects/jalan/data/api.log
+StandardError=append:/root/projects/jalan/data/api.log
+
+[Install]
+WantedBy=multi-user.target

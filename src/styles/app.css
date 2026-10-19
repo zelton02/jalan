@@ -211,6 +211,54 @@ button {
   text-underline-offset: 4px;
 }
 
+.step--current .step__title {
+  font-weight: 600;
+}
+
+/* Alight banner. Sticky so it stays on screen once the rider is close. */
+.alight {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: 10px;
+  background: var(--color-action);
+  color: var(--color-action-ink);
+  box-shadow: 0 8px 20px rgba(20, 22, 26, 0.18);
+}
+
+.alight--now {
+  background: var(--color-danger);
+}
+
+.alight__label {
+  font-size: var(--type-size-xs);
+  letter-spacing: var(--type-tracking-label);
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.alight__name {
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.alight__btn {
+  flex: none;
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  background: transparent;
+  color: inherit;
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
 /* Colour key for the map lines. */
 .legend {
   display: flex;

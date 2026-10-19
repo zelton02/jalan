@@ -38,14 +38,15 @@ export function useGeolocation() {
         setWatching(true);
       },
       (err) => {
-        setError(
-          err.code === err.PERMISSION_DENIED
-            ? "Kebenaran lokasi ditolak. Benarkan dalam tetapan pelayar. / Location permission denied."
-            : "Lokasi tidak dapat dikesan. / Could not get a fix.",
-        );
-        setWatching(false);
-        if (watchId.current != null) navigator.geolocation.clearWatch(watchId.current);
-        watchId.current = null;
+        if (err.code === err.PERMISSION_DENIED) {
+          setError("Kebenaran lokasi ditolak. Benarkan dalam tetapan pelayar. / Location permission denied.");
+          setWatching(false);
+          if (watchId.current != null) navigator.geolocation.clearWatch(watchId.current);
+          watchId.current = null;
+          return;
+        }
+        // A timeout or a weak signal is not fatal: keep watching and let the next fix through.
+        setError((prev) => prev ?? "Isyarat GPS lemah — menunggu lokasi. / Weak GPS signal — waiting for a fix.");
       },
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 },
     );

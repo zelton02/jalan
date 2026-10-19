@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Alert from "../components/Alert";
 import Button from "../components/Button";
 import LineBadge from "../components/LineBadge";
@@ -6,6 +6,7 @@ import RouteMap from "../components/RouteMap";
 import { fetchVehicles } from "../api";
 import { lineShort, planRouteColors } from "../data/lines";
 import { useGeolocation } from "../useGeolocation";
+import { useJourneyProgress } from "../useJourneyProgress";
 import type { Plan, PlanLeg, Vehicle } from "../types";
 
 const kindLabel: Record<PlanLeg["kind"], string> = {
@@ -32,6 +33,8 @@ const liveLabel = (live: Live) => {
 
 type HourStat = { hour: number; n: number; median: number; p25: number; p75: number };
 const signed = (minutes: number) => (minutes === 0 ? "0" : `${minutes > 0 ? "+" : "−"}${Math.abs(minutes)}`);
+const fmtM = (metres: number | null) =>
+  metres == null ? "" : metres >= 1000 ? `${(metres / 1000).toFixed(1)} km` : `${Math.round(metres)} m`;
 
 /** Colour key for the map lines, shown only when the plan has more than one ride. */
 function RouteLegend({ plan }: { plan: Plan }) {
@@ -59,6 +62,9 @@ export default function Journey({ plan, onBack }: { plan: Plan; onBack: () => vo
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [started, setStarted] = useState(false);
   const geo = useGeolocation();
+  const progress = useJourneyProgress(plan, geo.fix, started);
+  const audio = useRef<AudioContext | null>(null);
+  const lastAlert = useRef<string | null>(null);
   const [now, setNow] = useState(klHM);
   const [punct, setPunct] = useState<Record<string, HourStat[]>>({});
   const [punctDays, setPunctDays] = useState(0);
@@ -132,12 +138,39 @@ export default function Journey({ plan, onBack }: { plan: Plan; onBack: () => vo
       setStarted(false);
       return;
     }
+    // AudioContext has to be created from a user gesture on iOS.
+    if (!audio.current) {
+      const Ctor = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (Ctor) audio.current = new Ctor();
+    }
+    audio.current?.resume().catch(() => {});
     geo.start();
     setStarted(true);
     window.requestAnimationFrame(() => {
       document.querySelector(".map")?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
   };
+
+  // One chirp + buzz per threshold, not on every GPS update.
+  useEffect(() => {
+    if (!started || !progress.alert) {
+      lastAlert.current = null;
+      return;
+    }
+    if (lastAlert.current === progress.alert) return;
+    lastAlert.current = progress.alert;
+    navigator.vibrate?.(progress.alert === "now" ? [300, 120, 300] : [180]);
+    const ctx = audio.current;
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.frequency.value = progress.alert === "now" ? 880 : 660;
+    gain.gain.value = 0.06;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.18);
+  }, [progress.alert, started]);
 
   return (
     <div className="screen screen--journey">
@@ -156,6 +189,20 @@ export default function Journey({ plan, onBack }: { plan: Plan; onBack: () => vo
       <RouteMap plan={plan} focus={focus} vehicles={vehicles} me={geo.fix} follow={started} />
       <RouteLegend plan={plan} />
 
+      {started && progress.alert ? (
+        <div className={`alight alight--${progress.alert}`} role="status">
+          <div>
+            <div className="alight__label">
+              {progress.alert === "now" ? "TURUN SEKARANG" : "MENDEKATI HENTIAN"}
+            </div>
+            <div className="alight__name">{progress.leg?.to}</div>
+          </div>
+          <button type="button" className="alight__btn" onClick={progress.advance}>
+            Saya dah turun
+          </button>
+        </div>
+      ) : null}
+
       <ol className="steps">
         {plan.legs.map((leg, index) => {
           const stations = (leg.stations ?? []).filter((s): s is { name: string; time: string } => Boolean(s.time));
@@ -167,7 +214,7 @@ export default function Journey({ plan, onBack }: { plan: Plan; onBack: () => vo
           return (
             <li
               key={`${leg.kind}-${leg.start}-${index}`}
-              className={`step ${index === 0 ? "step--next" : ""} ${focus === index ? "step--focus" : ""}`}
+              className={`step ${index === 0 ? "step--next" : ""} ${focus === index ? "step--focus" : ""} ${started && progress.legIndex === index ? "step--current" : ""}`}
               onClick={() => setFocus((current) => (current === index ? null : index))}
             >
               <div className="step__time">{leg.start}</div>
@@ -249,9 +296,13 @@ export default function Journey({ plan, onBack }: { plan: Plan; onBack: () => vo
         <div className="bottom__label">{started ? "SEDANG BERJALAN / RUNNING" : "SETERUSNYA / NEXT"}</div>
         <div className="bottom__next">
           {started
-            ? geo.fix
-              ? `Lokasi anda · ±${Math.round(geo.fix.accuracy)} m`
-              : "Mencari lokasi… / Finding your location…"
+            ? progress.leg?.kind === "ride" && progress.nextStop
+              ? `Seterusnya: ${progress.nextStop} · ${fmtM(progress.nextStopM)}`
+              : progress.remainingM != null
+                ? `Baki ${fmtM(progress.remainingM)}`
+                : geo.fix
+                  ? "Mencari jalan… / Finding your way…"
+                  : "Mencari lokasi… / Finding your location…"
             : `${next.title} · ${next.start}`}
         </div>
         <Button variant="primary" block onClick={toggleFollow}>

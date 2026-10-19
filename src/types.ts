@@ -33,6 +33,8 @@ export type PlanLeg = {
   /** Walk/transfer endpoints; the API fills polyline from OSRM when it can. */
   from_point?: [number, number];
   to_point?: [number, number];
+  stop_dist?: number[];
+  length_m?: number;
   live?: { vehicles: number; delay_min: number; updated_at: string; feed?: string };
 };
 

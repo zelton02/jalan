@@ -88,6 +88,15 @@ export const haversineM = (a, b) => {
 
 export const walkSecondsFor = (meters) => Math.round((meters * DETOUR) / WALK_SPEED_M_MIN * 60);
 
+/** Cumulative distance in metres along a [[lat, lon], ...] line. */
+const cumulative = (pts) => {
+  const out = new Array(pts.length).fill(0);
+  for (let i = 1; i < pts.length; i++) {
+    out[i] = out[i - 1] + haversineM({ lat: pts[i - 1][0], lon: pts[i - 1][1] }, { lat: pts[i][0], lon: pts[i][1] });
+  }
+  return out;
+};
+
 const cleanName = (name) => (name ?? "").replace(/\s*-\s*REDONE\s*$/i, "").trim();
 
 export const lineIdFor = (feed, routeId) => {
@@ -278,8 +287,25 @@ export function buildIndex(db) {
       errors[i] = bestD;
       cursor = best;
     }
-    anchorCache.set(pattern.id, { anchors, errors, pts });
+    anchorCache.set(pattern.id, { anchors, errors, pts, cum: cumulative(pts) });
     return anchorCache.get(pattern.id);
+  };
+
+  /** Distance in metres to each stop along the shape, from the boarding stop. */
+  const stopDistances = (pattern, fromIdx, toIdx) => {
+    const geo = anchorsFor(pattern);
+    if (!geo) return null;
+    const { anchors, errors, cum } = geo;
+    for (let i = fromIdx; i <= toIdx; i++) {
+      if (!(errors[i] <= 300)) return null; // a stop off the shape makes the whole slice lie
+    }
+    const a = anchors[fromIdx];
+    const b = anchors[toIdx];
+    if (!(b > a)) return null;
+    const base = cum[a];
+    const stopDist = [];
+    for (let i = fromIdx; i <= toIdx; i++) stopDist.push(Math.round(cum[anchors[i]] - base));
+    return { stop_dist: stopDist, length_m: Math.round(cum[b] - base) };
   };
 
   /** Polyline for one ride leg, downsampled to at most `maxPoints` points. */
@@ -301,7 +327,7 @@ export function buildIndex(db) {
     return out.map(([lat, lon]) => [Number(lat.toFixed(5)), Number(lon.toFixed(5))]);
   };
 
-  return { stops, byKey, near, neighbours, patterns, patternsAtStop, polyline };
+  return { stops, byKey, near, neighbours, patterns, patternsAtStop, polyline, stopDistances };
 }
 
 /** Per-service-day view: only patterns with a trip running today, only those trips. */
@@ -622,6 +648,9 @@ function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, day
         leg.duration = `${Math.max(1, Math.round((p.arr - lastRide.dep) / 60))} min`;
         leg.title = `${routeLabel} ke ${stations[stations.length - 1].name}`;
         leg.to = stations[stations.length - 1].name;
+        // The two halves can use different shapes; per-stop distances no longer line up.
+        delete leg.stop_dist;
+        delete leg.length_m;
         if (gap >= 60) leg.subtitle = `Sambung di ${stations[0].name} · tunggu ${Math.round(gap / 60)} min`;
         lastRide.arr = p.arr;
         lastRide.to = leg.to;
@@ -647,6 +676,8 @@ function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, day
         polyline: index.polyline(p.pattern, p.fromIdx, p.toIdx) ?? undefined,
         from_point: [index.byKey.get(p.pattern.stopKeys[p.fromIdx])?.lat, index.byKey.get(p.pattern.stopKeys[p.fromIdx])?.lon],
         to_point: [index.byKey.get(p.pattern.stopKeys[p.toIdx])?.lat, index.byKey.get(p.pattern.stopKeys[p.toIdx])?.lon],
+        // Metres along the shape for each stop, so the client can tell which stop is next.
+        ...(index.stopDistances(p.pattern, p.fromIdx, p.toIdx) ?? {}),
       };
       legs.push(leg);
       lastRide = { leg, route: routeLabel, routeId: p.pattern.routeId, to: leg.to, arr: p.arr, dep: p.dep };
