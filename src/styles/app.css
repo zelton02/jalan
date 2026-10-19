@@ -177,6 +177,33 @@ button {
   text-underline-offset: 4px;
 }
 
+/* Colour key for the map lines. */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: calc(-1 * var(--space-4)) 0 var(--space-5);
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+}
+
+.legend__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
 /* Search-as-you-type list, anchored under the input. Stops come first, places after. */
 .suggest {
   position: absolute;

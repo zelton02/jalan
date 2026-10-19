@@ -4,7 +4,7 @@ import Button from "../components/Button";
 import LineBadge from "../components/LineBadge";
 import RouteMap from "../components/RouteMap";
 import { fetchVehicles } from "../api";
-import { lineShort } from "../data/lines";
+import { lineShort, planRouteColors } from "../data/lines";
 import type { Plan, PlanLeg, Vehicle } from "../types";
 
 const kindLabel: Record<PlanLeg["kind"], string> = {
@@ -31,6 +31,26 @@ const liveLabel = (live: Live) => {
 
 type HourStat = { hour: number; n: number; median: number; p25: number; p75: number };
 const signed = (minutes: number) => (minutes === 0 ? "0" : `${minutes > 0 ? "+" : "−"}${Math.abs(minutes)}`);
+
+/** Colour key for the map lines, shown only when the plan has more than one ride. */
+function RouteLegend({ plan }: { plan: Plan }) {
+  const rides = plan.legs.filter((leg) => leg.kind === "ride");
+  if (rides.length < 2) return null;
+  const colors = planRouteColors(plan);
+  return (
+    <ul className="legend">
+      {rides.map((leg, index) => (
+        <li className="legend__item" key={`${leg.routeId ?? leg.route}-${index}`}>
+          <span
+            className="legend__dot"
+            style={{ background: colors.get(leg.routeId ?? leg.route ?? "bus") ?? "var(--color-action)" }}
+          />
+          {leg.route ?? lineShort[leg.line ?? "bus"]}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export default function Journey({ plan, onBack }: { plan: Plan; onBack: () => void }) {
   const [open, setOpen] = useState<number | null>(null);
@@ -117,6 +137,7 @@ export default function Journey({ plan, onBack }: { plan: Plan; onBack: () => vo
       {offline ? <Alert>Luar talian. Waktu dianggarkan. / Offline — times are estimates.</Alert> : null}
 
       <RouteMap plan={plan} focus={focus} vehicles={vehicles} />
+      <RouteLegend plan={plan} />
 
       <ol className="steps">
         {plan.legs.map((leg, index) => {

@@ -1,11 +1,13 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import type { Plan, Vehicle } from "../types";
+import type { Plan, PlanLeg, Vehicle } from "../types";
+import { planRouteColors } from "../data/lines";
 
 const RIDE_COLOR = "#0b6b3a";
 const PAPER = "#f7f5ef";
 const MUTED = "#5b6068";
+const INK = "#14161a";
 const VEHICLE = "#1d4ed8";
 
 const dotIcon = (color: string) =>
@@ -72,11 +74,25 @@ export default function RouteMap({ plan, focus = null, vehicles = [], compact = 
     const rides: [number, number][][] = [];
     const walkDash = { color: MUTED, weight: 3, opacity: 0.9, dashArray: "5 5" };
     const dashed = (a: [number, number], b: [number, number]) => L.polyline([a, b], walkDash).addTo(group);
+    const stopDot = (point: [number, number], color: string, name?: string) => {
+      const dot = L.circleMarker(point, { radius: 5, color, weight: 3, fillColor: "#ffffff", fillOpacity: 1 });
+      if (name) dot.bindTooltip(name, { direction: "top", offset: [0, -5] });
+      dot.addTo(group);
+    };
+
+    // Colours are assigned in plan order and never repeat inside one plan, so two routes read as
+    // different lines. Same helper as the legend under the map.
+    const colors = planRouteColors(plan);
+    const colorForLeg = (leg: PlanLeg) => {
+      if (leg.kind !== "ride") return MUTED;
+      return colors.get(leg.routeId ?? leg.route ?? "bus") ?? RIDE_COLOR;
+    };
 
     for (const leg of plan.legs) {
+      const color = colorForLeg(leg);
       if (leg.polyline?.length) {
         if (leg.kind === "ride") {
-          L.polyline(leg.polyline, { color: RIDE_COLOR, weight: 5, opacity: 0.9, lineJoin: "round" }).addTo(group);
+          L.polyline(leg.polyline, { color, weight: 5, opacity: 0.92, lineJoin: "round" }).addTo(group);
           rides.push(leg.polyline);
         } else {
           // Walk / transfer: the OSRM footpath when the API returned one.
@@ -85,9 +101,19 @@ export default function RouteMap({ plan, focus = null, vehicles = [], compact = 
         bounds.push(...leg.polyline);
       } else if (leg.kind === "ride" && leg.from_point && leg.to_point) {
         // The feed's shape does not cover this leg (loop detours); draw a faded straight line.
-        L.polyline([leg.from_point, leg.to_point], { color: RIDE_COLOR, weight: 3, opacity: 0.5, dashArray: "2 6" }).addTo(group);
+        L.polyline([leg.from_point, leg.to_point], { color, weight: 3, opacity: 0.5, dashArray: "2 6" }).addTo(group);
         rides.push([leg.from_point, leg.to_point]);
         bounds.push(leg.from_point, leg.to_point);
+      }
+
+      if (leg.kind === "ride") {
+        if (leg.from_point) stopDot(leg.from_point, color, leg.from);
+        if (leg.to_point) stopDot(leg.to_point, color, leg.to);
+      } else if (leg.kind === "transfer" && leg.from_point) {
+        // Ring around the platform where the rider changes.
+        const ring = L.circleMarker(leg.from_point, { radius: 8, color: INK, weight: 2, fill: false, dashArray: "1 3" });
+        ring.bindTooltip(leg.title, { direction: "top", offset: [0, -9] });
+        ring.addTo(group);
       }
     }
 

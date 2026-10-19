@@ -40,6 +40,11 @@ required, light personal use).
   anchored to the nearest shape point with a forward-only search so loop services do not fold
   back; a stop more than 300 m off the shape means the feed's geometry skips that detour, and the
   leg is drawn as a faded straight line instead. Slices are downsampled to 300 points.
+- Every ride keeps its own colour: rail legs use the line's signage colour from `tokens.css`, bus
+  routes take the next palette slot in plan order (so two bus legs never share one). A legend
+  under the map names them.
+- Boarding and alighting points get a white dot ringed in the line's colour; a dashed ink ring
+  marks the platform where a transfer happens.
 - Walk and transfer legs use the OSRM footpath geometry, requested once per leg at response time
   and cached by coordinate pair.
 - Live vehicles on the plan's routes are blue dots, refreshed every 20 s from `/api/vehicles`.
