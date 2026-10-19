@@ -3,8 +3,9 @@ import Alert from "../components/Alert";
 import Button from "../components/Button";
 import LineBadge from "../components/LineBadge";
 import RouteMap from "../components/RouteMap";
+import { fetchVehicles } from "../api";
 import { lineShort } from "../data/lines";
-import type { Plan, PlanLeg } from "../types";
+import type { Plan, PlanLeg, Vehicle } from "../types";
 
 const kindLabel: Record<PlanLeg["kind"], string> = {
   walk: "JALAN / WALK",
@@ -33,6 +34,8 @@ const signed = (minutes: number) => (minutes === 0 ? "0" : `${minutes > 0 ? "+" 
 
 export default function Journey({ plan, onBack }: { plan: Plan; onBack: () => void }) {
   const [open, setOpen] = useState<number | null>(null);
+  const [focus, setFocus] = useState<number | null>(null);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [now, setNow] = useState(klHM);
   const [punct, setPunct] = useState<Record<string, HourStat[]>>({});
   const [punctDays, setPunctDays] = useState(0);
@@ -41,6 +44,24 @@ export default function Journey({ plan, onBack }: { plan: Plan; onBack: () => vo
     const id = setInterval(() => setNow(klHM()), 30_000);
     return () => clearInterval(id);
   }, []);
+
+  // Live vehicles on the plan's routes, refreshed while the screen is open.
+  useEffect(() => {
+    const routes = [...new Set(plan.legs.map((leg) => leg.routeId).filter((id): id is string => Boolean(id)))];
+    if (!routes.length) return;
+    const ctrl = new AbortController();
+    const load = () => {
+      fetchVehicles(routes, ctrl.signal)
+        .then((list) => setVehicles(list))
+        .catch(() => {});
+    };
+    load();
+    const id = setInterval(load, 20_000);
+    return () => {
+      ctrl.abort();
+      clearInterval(id);
+    };
+  }, [plan]);
 
   useEffect(() => {
     const routes = [
@@ -95,7 +116,7 @@ export default function Journey({ plan, onBack }: { plan: Plan; onBack: () => vo
 
       {offline ? <Alert>Luar talian. Waktu dianggarkan. / Offline — times are estimates.</Alert> : null}
 
-      <RouteMap plan={plan} />
+      <RouteMap plan={plan} focus={focus} vehicles={vehicles} />
 
       <ol className="steps">
         {plan.legs.map((leg, index) => {
@@ -106,7 +127,11 @@ export default function Journey({ plan, onBack }: { plan: Plan; onBack: () => vo
           const isOpen = open === index;
 
           return (
-            <li key={`${leg.kind}-${leg.start}-${index}`} className={`step ${index === 0 ? "step--next" : ""}`}>
+            <li
+              key={`${leg.kind}-${leg.start}-${index}`}
+              className={`step ${index === 0 ? "step--next" : ""} ${focus === index ? "step--focus" : ""}`}
+              onClick={() => setFocus((current) => (current === index ? null : index))}
+            >
               <div className="step__time">{leg.start}</div>
               <div className="step__rail" aria-hidden="true">
                 <span className="step__dot" />

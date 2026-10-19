@@ -160,6 +160,23 @@ button {
   box-shadow: 0 0 0 2px rgba(20, 22, 26, 0.55);
 }
 
+/* Results preview: decorative only, so taps fall through to the card. */
+.map--compact {
+  height: 128px;
+  margin: 0 0 var(--space-2);
+  pointer-events: none;
+}
+
+.map--compact .leaflet-control-attribution {
+  display: none;
+}
+
+.step--focus .step__title {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+}
+
 /* Search-as-you-type list, anchored under the input. Stops come first, places after. */
 .suggest {
   position: absolute;

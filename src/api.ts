@@ -1,4 +1,4 @@
-import type { Plan } from "./types";
+import type { Plan, Vehicle } from "./types";
 
 type Options = { fromName?: string; toName?: string; at?: string; signal?: AbortSignal };
 
@@ -76,4 +76,16 @@ export async function fetchPlaceById(id: string, signal?: AbortSignal): Promise<
   const body = await res.json();
   if (!Number.isFinite(body.lat) || !Number.isFinite(body.lon)) return null;
   return body as ResolvedPlace;
+}
+
+export async function fetchVehicles(routes: string[], signal?: AbortSignal): Promise<Vehicle[]> {
+  const unique = [...new Set(routes.filter(Boolean))];
+  if (!unique.length) return [];
+  const res = await fetch(`/api/vehicles?routes=${encodeURIComponent(unique.join(","))}`, {
+    signal,
+    headers: { accept: "application/json" },
+  });
+  if (!res.ok) return [];
+  const body = await res.json();
+  return Array.isArray(body.vehicles) ? (body.vehicles as Vehicle[]) : [];
 }

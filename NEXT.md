@@ -40,7 +40,8 @@ changes, not when plans are made (plans belong in `BACKLOG.md`).
   leg when the hour has at least 8 buckets; the footnote states how many days of history exist.
   As of 2026-10-19 that is **1 day** — treat it as a pipeline that improves, not a verdict.
 - The Journey screen has a map: GTFS shapes for each ride leg (sliced between boarding and
-  alighting, loop-safe), dashed straight connectors for walks/transfers, and the two endpoints.
+  alighting, loop-safe), OSRM footpaths for walks, live vehicle dots, and tap-a-step to zoom.
+  Results cards carry a compact preview map.
 - Search is type-ahead: stops from the local index appear instantly, place suggestions (Google
   Places when keyed, Nominatim otherwise) slide in under them, and picking a result fills the
   field with coordinates (so "Bandar Utama" is the station, not the suburb). Keyboard: ↑/↓ +

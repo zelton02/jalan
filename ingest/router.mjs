@@ -250,6 +250,7 @@ export function buildIndex(db) {
       return null;
     }
     const anchors = new Array(pattern.stopKeys.length).fill(0);
+    const errors = new Array(pattern.stopKeys.length).fill(Infinity);
     let cursor = 0;
     for (let i = 0; i < pattern.stopKeys.length; i++) {
       const stop = byKey.get(pattern.stopKeys[i]);
@@ -269,9 +270,10 @@ export function buildIndex(db) {
         }
       }
       anchors[i] = best;
+      errors[i] = bestD;
       cursor = best;
     }
-    anchorCache.set(pattern.id, { anchors, pts });
+    anchorCache.set(pattern.id, { anchors, errors, pts });
     return anchorCache.get(pattern.id);
   };
 
@@ -279,9 +281,12 @@ export function buildIndex(db) {
   const polyline = (pattern, fromIdx, toIdx, maxPoints = 300) => {
     const geo = anchorsFor(pattern);
     if (!geo) return null;
-    const { anchors, pts } = geo;
+    const { anchors, errors, pts } = geo;
     const a = anchors[Math.max(0, fromIdx)];
     const b = anchors[Math.min(anchors.length - 1, toIdx)];
+    // A stop more than 300 m off the shape means this shape does not serve it (common on loop
+    // services whose feed geometry skips a detour); callers fall back to a straight line.
+    if (errors[fromIdx] > 300 || errors[toIdx] > 300) return null;
     if (!Number.isFinite(a) || !Number.isFinite(b) || b <= a) return null;
     const slice = pts.slice(a, b + 1);
     const step = Math.max(1, Math.ceil(slice.length / maxPoints));
@@ -457,7 +462,7 @@ function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, day
     labels.set(o.stop.key, {
       stop: o.stop, arr, round: 0,
       boardPenalty: boardBuffer,
-      parent: { type: "walk", prev: null, to: o.stop, meters: routed?.m ?? o.meters, secs: walkSec },
+      parent: { type: "walk", prev: null, to: o.stop, fromPoint: [from.lat, from.lon], meters: routed?.m ?? o.meters, secs: walkSec },
     });
   }
 
@@ -529,7 +534,7 @@ function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, day
         const next = {
           stop: nb.stop, arr, round,
           boardPenalty: boardBuffer + transferPenaltySec(label.stop, nb.stop),
-          parent: { type: "foot", prev: label, to: nb.stop, meters: nb.meters, secs: nb.walkSec + innerWalk },
+          parent: { type: "foot", prev: label, to: nb.stop, fromPoint: [label.stop.lat, label.stop.lon], meters: nb.meters, secs: nb.walkSec + innerWalk },
         };
         labels.set(nb.stop.key, next);
         const known = improved.get(nb.stop.key);
@@ -579,6 +584,8 @@ function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, day
         duration: `${Math.max(1, Math.round(p.secs / 60))} min`,
         title: `Jalan kaki ke ${p.to.name}`,
         subtitle: `${p.to.name} · ${Math.round(p.meters)} m`,
+        from_point: p.fromPoint,
+        to_point: [p.to.lat, p.to.lon],
       });
     } else if (p.type === "foot") {
       lastRide = null;
@@ -588,6 +595,8 @@ function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, day
         duration: `${Math.max(1, Math.round(p.secs / 60))} min`,
         title: `Tukar di ${p.to.name}`,
         subtitle: `${p.to.name} · ${Math.round(p.meters)} m`,
+        from_point: p.fromPoint,
+        to_point: [p.to.lat, p.to.lon],
       });
     } else if (p.type === "ride") {
       const routeLabel = p.pattern.route?.short_name || p.pattern.route?.long_name || p.pattern.routeId;
@@ -628,8 +637,11 @@ function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, day
         tripId: p.tripId,
         from: stations[0].name,
         to: stations[stations.length - 1].name,
-        // GTFS shape between boarding and alighting, downsampled. Absent for feeds without shapes.
+        // GTFS shape between boarding and alighting, downsampled. Absent for feeds without shapes
+        // or when the shape does not pass the stops (the map falls back to a straight line).
         polyline: index.polyline(p.pattern, p.fromIdx, p.toIdx) ?? undefined,
+        from_point: [index.byKey.get(p.pattern.stopKeys[p.fromIdx])?.lat, index.byKey.get(p.pattern.stopKeys[p.fromIdx])?.lon],
+        to_point: [index.byKey.get(p.pattern.stopKeys[p.toIdx])?.lat, index.byKey.get(p.pattern.stopKeys[p.toIdx])?.lon],
       };
       legs.push(leg);
       lastRide = { leg, route: routeLabel, routeId: p.pattern.routeId, to: leg.to, arr: p.arr, dep: p.dep };
@@ -649,6 +661,8 @@ function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, day
       duration: `${Math.max(1, Math.round(target.walkSec / 60))} min`,
       title: `Jalan kaki ke ${to.name ?? "destinasi"}`,
       subtitle: `${Math.round(target.meters)} m`,
+      from_point: target.label?.stop ? [target.label.stop.lat, target.label.stop.lon] : undefined,
+      to_point: [to.lat, to.lon],
     });
   }
   legs.push({

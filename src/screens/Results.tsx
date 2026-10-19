@@ -1,6 +1,7 @@
 import LineBadge from "../components/LineBadge";
 import Button from "../components/Button";
 import Alert from "../components/Alert";
+import RouteMap from "../components/RouteMap";
 import { lineShort } from "../data/lines";
 import type { Plan } from "../types";
 
@@ -42,7 +43,8 @@ export default function Results({ plans, onBack, onSelect }: Props) {
           const lines = plan.legs.filter((leg) => leg.line).map((leg) => leg.line!);
           const unique = [...new Set(lines)];
           return (
-            <li key={`${plan.depart}-${plan.arrive}-${index}`}>
+            <li key={`${plan.depart}-${plan.arrive}-${index}`} className="route-item">
+              <RouteMap plan={plan} compact />
               <button type="button" className="route" onClick={() => onSelect(index)}>
                 <div className="route__top">
                   <span className="route__time">{plan.total_minutes} min</span>

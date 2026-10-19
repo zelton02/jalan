@@ -23,6 +23,8 @@ console.log("RESULTS:", (await text()).replace(/\n+/g, " | "));
 
 await page.locator(".route").first().click();
 await page.waitForSelector(".screen--journey", { timeout: 5000 });
+await page.waitForSelector(".map .leaflet-tile", { timeout: 8000 });
+console.log("MAP:", await page.locator(".map img.leaflet-tile").count(), "tiles ·", await page.locator(".map path.leaflet-interactive").count(), "paths");
 console.log("JOURNEY:", (await text()).replace(/\n+/g, " | ").slice(0, 700));
 await page.screenshot({ path: "/root/projects/jalan/pr-assets/router-journey.png", fullPage: true });
 

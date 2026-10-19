@@ -53,6 +53,28 @@ export async function walkOne(from, to) {
   return out;
 }
 
+/** Single pair with geometry. Cached; used for walk/transfer legs at response time. */
+export async function walkRoute(from, to) {
+  const key = `route|${from.lat.toFixed(5)},${from.lon.toFixed(5)}|${to.lat.toFixed(5)},${to.lon.toFixed(5)}`;
+  if (cache.has(key)) return cache.get(key);
+  const body = await getJson(
+    `${OSRM_URL}/route/v1/foot/${coords([from, to])}?overview=full&geometries=geojson&steps=false`,
+  );
+  const route = body?.code === "Ok" ? body.routes?.[0] : null;
+  const line = route?.geometry?.coordinates;
+  const out = route
+    ? {
+        sec: Math.round(route.duration),
+        m: Math.round(route.distance),
+        polyline: Array.isArray(line)
+          ? line.map(([lon, lat]) => [Number(lat.toFixed(5)), Number(lon.toFixed(5))])
+          : null,
+      }
+    : null;
+  cache.set(key, out);
+  return out;
+}
+
 export async function walkHealthy() {
   const body = await getJson(`${OSRM_URL}/nearest/v1/foot/101.8,3.0?number=1`);
   return body?.code === "Ok";

@@ -22,7 +22,7 @@ import { openDb, metaMap, klNow, ymdInfo, hhmm } from "./lib.mjs";
 import { buildIndex, planJourney, planAlternatives, ACCESS_RADIUS_M, haversineM } from "./router.mjs";
 import { geocode, suggestPlaces } from "./geocode.mjs";
 import { googleEnabled, autocompletePlaces, placeById, geocodeWithGoogle } from "./google.mjs";
-import { walkMatrix } from "./walk.mjs";
+import { walkMatrix, walkRoute } from "./walk.mjs";
 import { liveStatus } from "./live.mjs";
 import { searchStops, nextDepartures } from "./board.mjs";
 import { routePunctuality } from "./punctuality.mjs";
@@ -173,6 +173,27 @@ function withLive(payload) {
     : decorate(payload);
 }
 
+/** OSRM footpath geometry for the walking legs, so the map draws the real path. */
+async function attachWalkGeometry(plans) {
+  const jobs = [];
+  for (const plan of plans) {
+    for (const leg of plan.legs) {
+      if (leg.kind !== "walk" && leg.kind !== "transfer") continue;
+      if (!leg.from_point || !leg.to_point) continue;
+      const from = { lat: leg.from_point[0], lon: leg.from_point[1] };
+      const to = { lat: leg.to_point[0], lon: leg.to_point[1] };
+      jobs.push(
+        walkRoute(from, to)
+          .then((route) => {
+            if (route?.polyline) leg.polyline = route.polyline;
+          })
+          .catch(() => {}),
+      );
+    }
+  }
+  await Promise.all(jobs);
+}
+
 /** "3.04,101.80" is used as-is; anything else goes through the cached geocoder. */
 async function resolvePlace(value, fallback, nameOverride) {
   if (!value) return fallback;
@@ -231,6 +252,8 @@ async function handlePlan(url, res, mode = "plan") {
   if (!plans.length) {
     return json(res, 404, { error: "Tiada laluan pada waktu ini. / No route at this time." });
   }
+
+  await attachWalkGeometry(plans);
 
   const clock = when.date
     ? `scheduled ${dash(when.date)}${atSec != null ? ` ${hhmm(atSec)}` : ""}`
@@ -328,6 +351,23 @@ createServer(async (req, res) => {
         }
       }
       return json(res, 200, { q, stops, places });
+    }
+    if (url.pathname === "/api/vehicles") {
+      const wanted = (url.searchParams.get("routes") ?? "")
+        .split(",")
+        .map((route) => route.trim())
+        .filter(Boolean);
+      const live = liveStatus();
+      if (!live.updated_at) return json(res, 200, { updated_at: null, vehicles: [] });
+      const vehicles = [];
+      for (const [id, bucket] of Object.entries(live.routes)) {
+        if (wanted.length && !wanted.includes(id)) continue;
+        for (const v of bucket.list) {
+          if (!Number.isFinite(v.lat) || !Number.isFinite(v.lon)) continue;
+          vehicles.push({ route: id, label: bucket.label, feed: bucket.feed, ...v });
+        }
+      }
+      return json(res, 200, { updated_at: live.updated_at, vehicles });
     }
     if (url.pathname === "/api/place") {
       const id = url.searchParams.get("id");

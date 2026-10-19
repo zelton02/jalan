@@ -34,11 +34,18 @@ centroid. Distances use the last "use my location" or the other field as the ref
 ## Map
 
 The journey screen draws the route on a Leaflet map with OpenStreetMap raster tiles (attribution
-required, light personal use). Ride legs use the GTFS `shapes.txt` geometry, sliced between the
-boarding and alighting stops: each stop is anchored to the nearest shape point, searching forward
-only so loop services do not fold back on themselves, then the slice is downsampled to 300 points.
-Walks and transfers are dashed straight connectors — the OSRM footpath geometry is not in the
-response yet. KTMB publishes no shapes, so its legs have no line.
+required, light personal use).
+
+- Ride legs use GTFS `shapes.txt`, sliced between the boarding and alighting stops. Each stop is
+  anchored to the nearest shape point with a forward-only search so loop services do not fold
+  back; a stop more than 300 m off the shape means the feed's geometry skips that detour, and the
+  leg is drawn as a faded straight line instead. Slices are downsampled to 300 points.
+- Walk and transfer legs use the OSRM footpath geometry, requested once per leg at response time
+  and cached by coordinate pair.
+- Live vehicles on the plan's routes are blue dots, refreshed every 20 s from `/api/vehicles`.
+- Tapping a step in the itinerary zooms the map to that leg; tapping it again returns to the
+  whole journey.
+- The results screen shows a compact, non-interactive preview map per route.
 
 ## Data pipeline
 

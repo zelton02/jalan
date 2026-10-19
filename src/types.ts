@@ -19,6 +19,9 @@ export type PlanLeg = {
   to?: string;
   /** GTFS shape between boarding and alighting: [[lat, lon], ...] */
   polyline?: [number, number][];
+  /** Walk/transfer endpoints; the API fills polyline from OSRM when it can. */
+  from_point?: [number, number];
+  to_point?: [number, number];
   live?: { vehicles: number; delay_min: number; updated_at: string; feed?: string };
 };
 
@@ -35,4 +38,17 @@ export type Plan = {
   clock?: string;
   warning?: string;
   legs: PlanLeg[];
+};
+
+export type Vehicle = {
+  id: string;
+  route: string;
+  label?: string;
+  feed?: string;
+  trip?: string;
+  lat: number;
+  lon: number;
+  bearing?: number | null;
+  delay_min?: number;
+  near_stop?: string;
 };

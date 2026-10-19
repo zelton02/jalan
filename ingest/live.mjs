@@ -51,6 +51,9 @@ export function liveStatus({ now = Math.floor(Date.now() / 1000), maxAgeSec = MA
         trip: v.trip,
         near_stop: est.nearStop,
         delay_min: Math.round(est.delayMin),
+        lat: v.lat,
+        lon: v.lon,
+        bearing: v.bearing ?? null,
       });
     }
 
