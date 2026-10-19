@@ -31,6 +31,15 @@ sends its coordinates; picking a place resolves its `place_id` to coordinates th
 `/api/place`. Either way "Bandar Utama" routes from the station or the mall, not from the suburb
 centroid. Distances use the last "use my location" or the other field as the reference point.
 
+## Map
+
+The journey screen draws the route on a Leaflet map with OpenStreetMap raster tiles (attribution
+required, light personal use). Ride legs use the GTFS `shapes.txt` geometry, sliced between the
+boarding and alighting stops: each stop is anchored to the nearest shape point, searching forward
+only so loop services do not fold back on themselves, then the slice is downsampled to 300 points.
+Walks and transfers are dashed straight connectors — the OSRM footpath geometry is not in the
+response yet. KTMB publishes no shapes, so its legs have no line.
+
 ## Data pipeline
 
 The app runs on Malaysia's official GTFS feeds, not mock data.

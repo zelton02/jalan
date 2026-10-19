@@ -131,6 +131,35 @@ button {
   color: var(--color-ink);
 }
 
+/* Route map on the journey screen. Tiles come straight from OpenStreetMap. */
+.map {
+  height: 270px;
+  margin: var(--space-4) 0 var(--space-6);
+  border: 1px solid var(--color-hairline);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.map .leaflet-container {
+  font: inherit;
+  background: var(--color-surface);
+}
+
+.map .leaflet-control-attribution {
+  font-size: 10px;
+  background: color-mix(in srgb, var(--color-surface) 82%, transparent);
+}
+
+.map-dot span {
+  display: block;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 3px solid var(--color-paper);
+  box-shadow: 0 0 0 2px rgba(20, 22, 26, 0.55);
+}
+
 /* Search-as-you-type list, anchored under the input. Stops come first, places after. */
 .suggest {
   position: absolute;

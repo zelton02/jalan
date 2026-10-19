@@ -20,6 +20,7 @@ const SCHEMA = `
     route_id TEXT NOT NULL,
     direction_id TEXT,
     headsign TEXT,
+    shape_id TEXT,               -- representative GTFS shape for this stop sequence
     stops TEXT NOT NULL,        -- JSON array of stop_id, in travel order
     offsets TEXT NOT NULL       -- JSON array of [arrival, departure] seconds from the first departure
   );
@@ -40,7 +41,7 @@ export function buildPatterns(db, { log = () => {} } = {}) {
 
   const trips = new Map();
   for (const r of db.prepare(
-    "SELECT feed, trip_id, route_id, direction_id, service_id, headsign FROM trips"
+    "SELECT feed, trip_id, route_id, direction_id, service_id, headsign, shape_id FROM trips"
   ).iterate()) {
     trips.set(`${r.feed}|${r.trip_id}`, r);
   }
@@ -68,10 +69,12 @@ export function buildPatterns(db, { log = () => {} } = {}) {
           (sec(r.arrival ?? r.departure) ?? first) - first,
           (sec(r.departure ?? r.arrival) ?? first) - first,
         ]),
+        shapes: new Map(),
         trips: [],
       };
       groups.set(key, group);
     }
+    if (meta.shape_id) group.shapes.set(meta.shape_id, (group.shapes.get(meta.shape_id) ?? 0) + 1);
     group.trips.push({ tripId: trip, serviceId: meta.service_id, firstDep: first });
   };
 
@@ -88,15 +91,23 @@ export function buildPatterns(db, { log = () => {} } = {}) {
   }
   flush();
 
-  const insPattern = db.prepare("INSERT INTO patterns VALUES (?,?,?,?,?,?,?)");
+  const insPattern = db.prepare("INSERT INTO patterns VALUES (?,?,?,?,?,?,?,?)");
   const insTrip = db.prepare("INSERT INTO pattern_trips VALUES (?,?,?,?,?)");
   db.exec("BEGIN");
   let id = 0;
   let tripCount = 0;
   for (const group of groups.values()) {
     id++;
+    let shapeId = null;
+    let best = 0;
+    for (const [shape, count] of group.shapes) {
+      if (count > best) {
+        best = count;
+        shapeId = shape;
+      }
+    }
     insPattern.run(
-      id, group.feed, group.routeId, group.directionId, group.headsign,
+      id, group.feed, group.routeId, group.directionId, group.headsign, shapeId,
       JSON.stringify(group.stops), JSON.stringify(group.offsets),
     );
     group.trips.sort((a, b) => a.firstDep - b.firstDep);

@@ -175,7 +175,7 @@ export function buildIndex(db) {
   const patterns = [];
   const byId = new Map();
   for (const r of db.prepare(
-    "SELECT pattern_id, feed, route_id, direction_id, headsign, stops, offsets FROM patterns ORDER BY pattern_id"
+    "SELECT pattern_id, feed, route_id, direction_id, headsign, shape_id, stops, offsets FROM patterns ORDER BY pattern_id"
   ).all()) {
     const stopIds = JSON.parse(r.stops);
     const offsets = JSON.parse(r.offsets);
@@ -186,6 +186,7 @@ export function buildIndex(db) {
       routeId: r.route_id,
       directionId: r.direction_id,
       headsign: r.headsign,
+      shapeId: r.shape_id,
       stopIds,
       stopKeys: stopIds.map((id) => `${r.feed}|${id}`),
       relArr: offsets.map((o) => o[0] - base),
@@ -224,7 +225,73 @@ export function buildIndex(db) {
     }
   }
 
-  return { stops, byKey, near, neighbours, patterns, patternsAtStop };
+  // --- geometry -------------------------------------------------------------------------
+  // Shapes are only loaded for patterns that actually appear in a plan, not all 645 up front.
+  const shapeCache = new Map();
+  const shapePoints = (feed, shapeId) => {
+    if (!shapeId) return null;
+    const key = `${feed}|${shapeId}`;
+    if (shapeCache.has(key)) return shapeCache.get(key);
+    const pts = db.prepare("SELECT lat, lon FROM shapes WHERE feed = ? AND shape_id = ? ORDER BY seq")
+      .all(feed, shapeId)
+      .map((r) => [r.lat, r.lon]);
+    const value = pts.length >= 2 ? pts : null;
+    shapeCache.set(key, value);
+    return value;
+  };
+
+  // Stop position -> nearest point on the shape, searched forward only so loops do not jump back.
+  const anchorCache = new Map();
+  const anchorsFor = (pattern) => {
+    if (anchorCache.has(pattern.id)) return anchorCache.get(pattern.id);
+    const pts = shapePoints(pattern.feed, pattern.shapeId);
+    if (!pts) {
+      anchorCache.set(pattern.id, null);
+      return null;
+    }
+    const anchors = new Array(pattern.stopKeys.length).fill(0);
+    let cursor = 0;
+    for (let i = 0; i < pattern.stopKeys.length; i++) {
+      const stop = byKey.get(pattern.stopKeys[i]);
+      if (!stop) {
+        anchors[i] = cursor;
+        continue;
+      }
+      let best = cursor;
+      let bestD = Infinity;
+      for (let j = cursor; j < pts.length; j++) {
+        const d = haversineM(stop, { lat: pts[j][0], lon: pts[j][1] });
+        if (d < bestD) {
+          bestD = d;
+          best = j;
+        } else if (bestD < 150 && d > bestD + 200) {
+          break; // the shape has left this stop behind
+        }
+      }
+      anchors[i] = best;
+      cursor = best;
+    }
+    anchorCache.set(pattern.id, { anchors, pts });
+    return anchorCache.get(pattern.id);
+  };
+
+  /** Polyline for one ride leg, downsampled to at most `maxPoints` points. */
+  const polyline = (pattern, fromIdx, toIdx, maxPoints = 300) => {
+    const geo = anchorsFor(pattern);
+    if (!geo) return null;
+    const { anchors, pts } = geo;
+    const a = anchors[Math.max(0, fromIdx)];
+    const b = anchors[Math.min(anchors.length - 1, toIdx)];
+    if (!Number.isFinite(a) || !Number.isFinite(b) || b <= a) return null;
+    const slice = pts.slice(a, b + 1);
+    const step = Math.max(1, Math.ceil(slice.length / maxPoints));
+    const out = [];
+    for (let i = 0; i < slice.length; i += step) out.push(slice[i]);
+    if (out[out.length - 1] !== slice[slice.length - 1]) out.push(slice[slice.length - 1]);
+    return out.map(([lat, lon]) => [Number(lat.toFixed(5)), Number(lon.toFixed(5))]);
+  };
+
+  return { stops, byKey, near, neighbours, patterns, patternsAtStop, polyline };
 }
 
 /** Per-service-day view: only patterns with a trip running today, only those trips. */
@@ -561,6 +628,8 @@ function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, day
         tripId: p.tripId,
         from: stations[0].name,
         to: stations[stations.length - 1].name,
+        // GTFS shape between boarding and alighting, downsampled. Absent for feeds without shapes.
+        polyline: index.polyline(p.pattern, p.fromIdx, p.toIdx) ?? undefined,
       };
       legs.push(leg);
       lastRide = { leg, route: routeLabel, routeId: p.pattern.routeId, to: leg.to, arr: p.arr, dep: p.dep };
@@ -593,6 +662,8 @@ function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, day
   return {
     origin: from.name ?? `${from.lat.toFixed(4)},${from.lon.toFixed(4)}`,
     destination: to.name ?? `${to.lat.toFixed(4)},${to.lon.toFixed(4)}`,
+    origin_point: [from.lat, from.lon],
+    destination_point: [to.lat, to.lon],
     depart,
     arrive,
     total_minutes: totalMinutes,

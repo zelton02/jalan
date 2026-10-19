@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import Alert from "../components/Alert";
 import Button from "../components/Button";
 import LineBadge from "../components/LineBadge";
+import RouteMap from "../components/RouteMap";
 import { lineShort } from "../data/lines";
 import type { Plan, PlanLeg } from "../types";
 
@@ -93,6 +94,8 @@ export default function Journey({ plan, onBack }: { plan: Plan; onBack: () => vo
       </header>
 
       {offline ? <Alert>Luar talian. Waktu dianggarkan. / Offline — times are estimates.</Alert> : null}
+
+      <RouteMap plan={plan} />
 
       <ol className="steps">
         {plan.legs.map((leg, index) => {

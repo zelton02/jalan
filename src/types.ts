@@ -17,12 +17,16 @@ export type PlanLeg = {
   tripId?: string;
   from?: string;
   to?: string;
+  /** GTFS shape between boarding and alighting: [[lat, lon], ...] */
+  polyline?: [number, number][];
   live?: { vehicles: number; delay_min: number; updated_at: string; feed?: string };
 };
 
 export type Plan = {
   origin: string;
   destination: string;
+  origin_point?: [number, number];
+  destination_point?: [number, number];
   depart: string;
   arrive: string;
   date?: string;

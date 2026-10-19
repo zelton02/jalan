@@ -69,11 +69,12 @@ function main(feeds) {
     CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
     CREATE TABLE stops (feed TEXT, stop_id TEXT, stop_name TEXT, lat REAL, lon REAL, category TEXT, PRIMARY KEY (feed, stop_id));
     CREATE TABLE routes (feed TEXT, route_id TEXT, short_name TEXT, long_name TEXT, route_type TEXT, color TEXT, text_color TEXT, category TEXT, PRIMARY KEY (feed, route_id));
-    CREATE TABLE trips (feed TEXT, trip_id TEXT, route_id TEXT, service_id TEXT, headsign TEXT, direction_id TEXT, PRIMARY KEY (feed, trip_id));
+    CREATE TABLE trips (feed TEXT, trip_id TEXT, route_id TEXT, service_id TEXT, headsign TEXT, direction_id TEXT, shape_id TEXT, PRIMARY KEY (feed, trip_id));
     CREATE TABLE stop_times (feed TEXT, trip_id TEXT, stop_sequence INTEGER, stop_id TEXT, arrival TEXT, departure TEXT, PRIMARY KEY (feed, trip_id, stop_sequence));
     CREATE TABLE calendar (feed TEXT, service_id TEXT, mon INT, tue INT, wed INT, thu INT, fri INT, sat INT, sun INT, start_date TEXT, end_date TEXT, PRIMARY KEY (feed, service_id));
     CREATE TABLE calendar_dates (feed TEXT, service_id TEXT, date TEXT, exception_type INT);
     CREATE TABLE frequencies (feed TEXT, trip_id TEXT, start_time TEXT, end_time TEXT, headway_secs INT);
+    CREATE TABLE shapes (feed TEXT, shape_id TEXT, seq INTEGER, lat REAL, lon REAL, PRIMARY KEY (feed, shape_id, seq));
     CREATE INDEX idx_stop_times_stop ON stop_times (feed, stop_id);
     CREATE INDEX idx_stop_times_trip ON stop_times (feed, trip_id);
     CREATE INDEX idx_trips_route ON trips (feed, route_id);
@@ -81,7 +82,8 @@ function main(feeds) {
 
   const insStop = db.prepare("INSERT OR REPLACE INTO stops VALUES (?,?,?,?,?,?)");
   const insRoute = db.prepare("INSERT OR REPLACE INTO routes VALUES (?,?,?,?,?,?,?,?)");
-  const insTrip = db.prepare("INSERT OR REPLACE INTO trips VALUES (?,?,?,?,?,?)");
+  const insTrip = db.prepare("INSERT OR REPLACE INTO trips VALUES (?,?,?,?,?,?,?)");
+  const insShape = db.prepare("INSERT OR REPLACE INTO shapes VALUES (?,?,?,?,?)");
   const insST = db.prepare("INSERT OR REPLACE INTO stop_times VALUES (?,?,?,?,?,?)");
   const insCal = db.prepare("INSERT OR REPLACE INTO calendar VALUES (?,?,?,?,?,?,?,?,?,?,?)");
   const insCalDate = db.prepare("INSERT INTO calendar_dates VALUES (?,?,?,?)");
@@ -110,8 +112,18 @@ function main(feeds) {
     const trips = read(dir, "trips.txt");
     if (trips) {
       const rows = parseCsvObjects(trips);
-      for (const r of rows) insTrip.run(feed.key, r.trip_id, r.route_id, r.service_id, r.trip_headsign ?? null, r.direction_id ?? null);
+      for (const r of rows) insTrip.run(feed.key, r.trip_id, r.route_id, r.service_id, r.trip_headsign ?? null, r.direction_id ?? null, r.shape_id ?? null);
       counts.trips = rows.length;
+    }
+
+    // Route geometry, one row per point. ~110k rows across the three feeds that publish it.
+    const shapes = read(dir, "shapes.txt");
+    if (shapes) {
+      const rows = parseCsvObjects(shapes);
+      for (const r of rows) {
+        insShape.run(feed.key, r.shape_id, toInt(r.shape_pt_sequence), Number(r.shape_pt_lat), Number(r.shape_pt_lon));
+      }
+      counts.shapes = rows.length;
     }
 
     const st = read(dir, "stop_times.txt");

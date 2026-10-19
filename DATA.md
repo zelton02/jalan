@@ -127,6 +127,14 @@ promise for the specific trip**, and the UI says so. Rail has no realtime at all
 
 `npm run live -- --route U5900` prints the vehicles behind the number.
 
+### Route geometry
+
+`shapes.txt` is ingested into a `shapes(feed, shape_id, seq, lat, lon)` table (~242k points across
+the feeds that publish it) and `patterns.shape_id` keeps the most common shape for each stop
+sequence. The router loads a shape only when a leg uses it, anchors each stop to the nearest shape
+point (forward-only search), and returns the slice as `legs[].polyline` (max 300 points). KTMB has
+no `shapes.txt`, so its legs carry no polyline and the map draws only the endpoints.
+
 ### Geocoding
 
 `ingest/geocode.mjs` resolves addresses through Nominatim (1 req/s, a real User-Agent) and caches

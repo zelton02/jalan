@@ -39,9 +39,12 @@ changes, not when plans are made (plans belong in `BACKLOG.md`).
   count) from the collected positions. The Journey screen shows “BIASA +1′ · 15 SAMPEL” under the
   leg when the hour has at least 8 buckets; the footnote states how many days of history exist.
   As of 2026-10-19 that is **1 day** — treat it as a pipeline that improves, not a verdict.
-- Search is type-ahead: stops from the local index appear instantly, Nominatim places slide in
-  under them, and picking a result fills the field with coordinates (so "Bandar Utama" is the
-  station, not the suburb). Keyboard: ↑/↓ + Enter, Esc closes.
+- The Journey screen has a map: GTFS shapes for each ride leg (sliced between boarding and
+  alighting, loop-safe), dashed straight connectors for walks/transfers, and the two endpoints.
+- Search is type-ahead: stops from the local index appear instantly, place suggestions (Google
+  Places when keyed, Nominatim otherwise) slide in under them, and picking a result fills the
+  field with coordinates (so "Bandar Utama" is the station, not the suburb). Keyboard: ↑/↓ +
+  Enter, Esc closes.
 - Production is `https://zhng.tech` (Caddy + Let's Encrypt behind Cloudflare). The search screen has
   a star on each field: it saves the current value as Rumah / Kerja in localStorage, chips fill
   them back, and the last five successful searches appear under BARU-BARU / RECENT.
