@@ -15,18 +15,10 @@ export default function App() {
   const [message, setMessage] = useState("");
 
   const search = async (from: string, to: string) => {
-    const normal = (v: string) => v.toLowerCase().replace(/[^a-z ]/g, "").trim();
-    const supported =
-      normal(from).includes("sungai long") && normal(to).includes("kl sentral");
-    if (!supported) {
-      setStatus("error");
-      setMessage("Laluan ini belum disokong. / This route isn't supported yet.");
-      return;
-    }
     setStatus("loading");
     setMessage("");
     try {
-      const next = await fetchPlan();
+      const next = await fetchPlan(from, to);
       setPlan(next);
       setScreen("results");
       setStatus("idle");

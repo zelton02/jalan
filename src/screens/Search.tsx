@@ -34,7 +34,7 @@ export default function Search({ onSearch, loading, error }: Props) {
       <Button variant="primary" block onClick={() => onSearch(from, to)} disabled={loading}>
         {loading ? "Mencari… / Searching…" : "Cari laluan / Find routes"}
       </Button>
-      <p className="footnote">Buat masa ini: Sungai Long → KL Sentral sahaja. / This corridor only, for now.</p>
+      <p className="footnote">Mana-mana alamat di Malaysia. / Any address in Malaysia.</p>
 
       <section className="section">
         <div className="eyebrow">BARU-BARU / RECENT</div>
