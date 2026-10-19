@@ -141,6 +141,116 @@ button {
   background: var(--color-ink);
 }
 
+.linkish {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-3);
+  padding: var(--space-2) 0;
+  border: 0;
+  background: none;
+  color: var(--color-ink-muted);
+  font: inherit;
+  font-size: var(--type-size-xs);
+  letter-spacing: var(--type-tracking-label);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.board__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) 0 var(--space-3);
+}
+
+.board__change {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--color-ink-muted);
+  font: inherit;
+  font-size: var(--type-size-xs);
+  letter-spacing: var(--type-tracking-label);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.stop-hit {
+  display: flex;
+  width: 100%;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) 0;
+  border: 0;
+  border-bottom: 1px solid var(--color-hairline);
+  background: none;
+  color: var(--color-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.stop-hit__meta {
+  color: var(--color-ink-muted);
+  font-size: var(--type-size-xs);
+  white-space: nowrap;
+}
+
+.dep {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  gap: var(--space-4);
+  align-items: start;
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--color-hairline);
+}
+
+.dep__min {
+  font-size: var(--type-size-lg);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.dep__min span {
+  margin-left: 1px;
+  color: var(--color-ink-muted);
+  font-size: var(--type-size-xs);
+}
+
+.dep__top {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.dep__route {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dep__dest {
+  overflow: hidden;
+  color: var(--color-ink-muted);
+  font-size: var(--type-size-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dep__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  color: var(--color-ink-muted);
+  font-size: var(--type-size-xs);
+}
+
+.dep__live {
+  letter-spacing: var(--type-tracking-label);
+}
+
 .when {
   position: relative;
   margin-bottom: var(--space-6);

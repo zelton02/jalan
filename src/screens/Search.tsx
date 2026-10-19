@@ -3,9 +3,14 @@ import Field from "../components/Field";
 import Button from "../components/Button";
 import Alert from "../components/Alert";
 
-type Props = { onSearch: (from: string, to: string, fromName?: string, at?: string) => void; loading: boolean; error: string | null };
+type Props = {
+  onSearch: (from: string, to: string, fromName?: string, at?: string) => void;
+  onBoard: () => void;
+  loading: boolean;
+  error: string | null;
+};
 
-export default function Search({ onSearch, loading, error }: Props) {
+export default function Search({ onSearch, onBoard, loading, error }: Props) {
   const [from, setFrom] = useState("Sungai Long");
   const [to, setTo] = useState("KL Sentral");
   const [fromName, setFromName] = useState<string | undefined>();
@@ -84,6 +89,9 @@ export default function Search({ onSearch, loading, error }: Props) {
       <Button variant="primary" block onClick={() => onSearch(from, to, fromName, when || undefined)} disabled={loading}>
         {loading ? "Mencari… / Searching…" : "Cari laluan / Find routes"}
       </Button>
+      <button type="button" className="linkish" onClick={onBoard}>
+        Jadual hentian / Stop board →
+      </button>
       <p className="footnote">Mana-mana alamat di Malaysia. / Any address in Malaysia.</p>
 
       <section className="section">

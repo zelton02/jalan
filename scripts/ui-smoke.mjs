@@ -58,5 +58,15 @@ await page.locator("button", { hasText: "lokasi" }).click();
 await page.waitForTimeout(1500);
 console.log("GEO:", (await text()).replace(/\n+/g, " | ").slice(0, 300));
 
+// 5. stop board: search a stop, then read its departures
+await page.goto("http://127.0.0.1:4173", { waitUntil: "networkidle" });
+await page.locator("button", { hasText: "Jadual hentian" }).click();
+await page.locator(".field__input").fill("KJ477");
+await page.waitForSelector(".stop-hit", { timeout: 8000 });
+await page.locator(".stop-hit").first().click();
+await page.waitForSelector(".dep", { timeout: 8000 });
+console.log("BOARD:", (await text()).replace(/\n+/g, " | ").slice(0, 500));
+await page.screenshot({ path: "/root/projects/jalan/pr-assets/board-departures.png", fullPage: true });
+
 console.log("ERRORS:", errors.length ? errors : "none");
 await browser.close();

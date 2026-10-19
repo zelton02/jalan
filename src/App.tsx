@@ -2,10 +2,11 @@ import { useState } from "react";
 import Search from "./screens/Search";
 import Results from "./screens/Results";
 import Journey from "./screens/Journey";
+import Board from "./screens/Board";
 import { fetchPlans } from "./api";
 import type { Plan } from "./types";
 
-type Screen = "search" | "results" | "journey";
+type Screen = "search" | "results" | "journey" | "board";
 type Status = "idle" | "loading" | "error";
 
 export default function App() {
@@ -33,7 +34,15 @@ export default function App() {
 
   return (
     <main className="app">
-      {screen === "search" && <Search onSearch={search} loading={status === "loading"} error={status === "error" ? message : null} />}
+      {screen === "search" && (
+        <Search
+          onSearch={search}
+          onBoard={() => setScreen("board")}
+          loading={status === "loading"}
+          error={status === "error" ? message : null}
+        />
+      )}
+      {screen === "board" && <Board onBack={() => setScreen("search")} />}
       {screen === "results" && plans.length > 0 && (
         <Results
           plans={plans}

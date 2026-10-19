@@ -28,8 +28,13 @@ changes, not when plans are made (plans belong in `BACKLOG.md`).
 - Live bus status: `ingest/live.mjs` infers each vehicle's run from the pattern's frequency
   windows (RT `trip_id` is often a stale template), and `/api/live?route=U5900` returns the
   vehicles + median delay. Ride legs in `/api/plan(s)` carry `live: {vehicles, delay_min, feed}`.
-  The Journey screen shows “LIVE LEWAT 3 MIN · 2 BAS”; the footnote says it is a route estimate,
-  not this trip. Ambiguous matches are dropped, not guessed.
+  Ambiguous matches are dropped, not guessed.
+- The Journey screen shows “LIVE LEWAT 3 MIN · 2 BAS” with a footnote saying it is a route
+  estimate, not this trip.
+- Departure board: `/api/stops?q=` searches the stop index (exact token beats a token prefix, so
+  “UTAR” beats “CYBERJAYA UTARA”); `/api/departures?stop=bus|1004189` expands every frequency
+  window into actual runs, drops patterns where the stop is the terminus, and shows route,
+  destination, countdown and scheduled time. The “Jadual hentian” screen polls every 30 s.
 - The UI searches any Malaysian address; the corridor gate is gone.
 - `/api/plans` returns up to 3 itineraries, each forced to start on a different first vehicle;
   the results screen lists them with Tercepat / Alternatif tags.
@@ -45,12 +50,12 @@ changes, not when plans are made (plans belong in `BACKLOG.md`).
 
 Pick one:
 
-1. **Cross-state connection quality**: the ETS reaches Bukit Mertajam 11:57 and CT14 leaves 16:54.
+1. **Realtime history**: the collector has been sampling since 2026-10-18. Use it for “this route is
+   usually +6 min at 08:00” (median by route × hour), which is steadier than one live snapshot.
+2. **Saved places / HTTPS**: the “recent” list is static copy; geolocation needs HTTPS to work on a
+   phone. Both are small, both make the app usable daily.
+3. **Cross-state connection quality**: the ETS reaches Bukit Mertajam 11:57 and CT14 leaves 16:54.
    Check whether Butterworth + ferry is better, or whether the Penang feed simply lacks trips.
-2. **Realtime**: bus vehicle positions exist; rail returns 404. Keep positions schedule-derived
-   until a feed is verified.
-3. **Saved places**: the “recent” list on the search screen is static copy. Wire it to
-   localStorage and add a home chip.
 
 ## Known gaps
 

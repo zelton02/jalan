@@ -7,6 +7,9 @@
  *
  * Endpoints:
  *   GET /api/health
+ *   GET /api/stops?q=UTAR                 -> stop search for the board
+ *   GET /api/departures?stop=bus|1000383  -> next departures at a stop
+ *   GET /api/live?route=U5900             -> vehicles + inferred delay
  *   GET /api/plan                        -> Sungai Long -> KL Sentral (default demo trip)
  *   GET /api/plan?from=Sungai+Long&to=KL+Sentral
  *   GET /api/plan?from=3.04,101.80&to=3.13,101.68&at=08:00&rounds=3
@@ -18,6 +21,7 @@ import { openDb, metaMap, klNow, ymdInfo, hhmm } from "./lib.mjs";
 import { buildIndex, planJourney, planAlternatives } from "./router.mjs";
 import { geocode } from "./geocode.mjs";
 import { liveStatus } from "./live.mjs";
+import { searchStops, nextDepartures } from "./board.mjs";
 
 const argv = process.argv.slice(2);
 const atIdx = argv.indexOf("--at");
@@ -271,6 +275,42 @@ createServer(async (req, res) => {
         return json(res, 200, { updated_at: live.updated_at, ...hit });
       }
       return json(res, 200, live);
+    }
+    if (url.pathname === "/api/stops") {
+      const q = url.searchParams.get("q") ?? "";
+      const limit = Math.min(20, Math.max(1, Number(url.searchParams.get("limit") ?? 8) || 8));
+      return json(res, 200, { stops: searchStops(index, q, limit) });
+    }
+    if (url.pathname === "/api/departures") {
+      const stopKey = url.searchParams.get("stop");
+      if (!stopKey) return json(res, 400, { error: "stop diperlukan. / stop is required." });
+      freshen();
+      if (!index.patternsAtStop.has(stopKey)) {
+        return json(res, 404, { error: "Hentian tidak dijumpai. / Stop not found." });
+      }
+      const limit = Math.min(20, Math.max(1, Number(url.searchParams.get("limit") ?? 8) || 8));
+      const board = nextDepartures(db, index, stopKey, { limit });
+      const live = liveStatus();
+      const departures = board.departures.map((d) => {
+        const status = live.routes[d.routeId];
+        return status
+          ? { ...d, live: { delay_min: status.median_delay_min, vehicles: status.vehicles } }
+          : d;
+      });
+      const stop = index.byKey.get(stopKey);
+      return json(res, 200, {
+        stop: {
+          key: stopKey,
+          name: stop?.name ?? stopKey,
+          feed: stop?.feed ?? null,
+          lat: stop?.lat ?? null,
+          lon: stop?.lon ?? null,
+        },
+        date: board.date,
+        at: board.at,
+        updated_at: live.updated_at,
+        departures,
+      });
     }
     if (url.pathname === "/api/plan") return await handlePlan(url, res, "plan");
     if (url.pathname === "/api/plans") return await handlePlan(url, res, "plans");

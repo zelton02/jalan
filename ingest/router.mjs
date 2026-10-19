@@ -28,7 +28,7 @@ export const walkSecondsFor = (meters) => Math.round((meters * DETOUR) / WALK_SP
 
 const cleanName = (name) => (name ?? "").replace(/\s*-\s*REDONE\s*$/i, "").trim();
 
-const lineIdFor = (feed, routeId) => {
+export const lineIdFor = (feed, routeId) => {
   if (feed === "ktmb") return "ktm";
   if (feed === "rail") {
     if (routeId === "KGL") return "kajang";

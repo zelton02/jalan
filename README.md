@@ -34,6 +34,8 @@ npm run next -- --stop KG31 --dir north --json  # machine-readable
 npm run route -- --from 3.0417,101.8014 --to 3.1344,101.6863 --at 08:00
 npm run route -- --from 3.0417,101.8014 --to 3.1344,101.6863 --date 2026-10-21 --at 07:00
 npm run live -- --route U5900                     # live vehicles + inferred delay
+npm run board -- --q UTAR                         # find stops
+npm run board -- --stop "bus|1004189"             # next departures at a stop
 ```
 
 The router (round-based RAPTOR over precomputed patterns) plans any A→B point. `npm run ingest`
