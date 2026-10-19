@@ -1,6 +1,8 @@
 import { chromium } from "playwright-core";
 
+const BASE = "https://zhng.tech";
 const EXE = "/root/.cache/ms-playwright/chromium_headless_shell-1228/chrome-headless-shell-linux64/chrome-headless-shell";
+
 const browser = await chromium.launch({
   executablePath: EXE,
   args: ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--single-process"],
@@ -11,7 +13,7 @@ page.on("pageerror", (e) => errors.push(String(e)));
 page.on("console", (m) => m.type() === "error" && errors.push(m.text()));
 const text = () => page.locator("body").innerText();
 
-await page.goto("http://127.0.0.1:4173", { waitUntil: "networkidle" });
+await page.goto(BASE, { waitUntil: "networkidle" });
 console.log("SEARCH:", (await text()).split("\n").slice(0, 6).join(" | "));
 
 // 1. default text search
@@ -25,7 +27,7 @@ console.log("JOURNEY:", (await text()).replace(/\n+/g, " | ").slice(0, 700));
 await page.screenshot({ path: "/root/projects/jalan/pr-assets/router-journey.png", fullPage: true });
 
 // 2. coordinate search → multiple alternatives
-await page.goto("http://127.0.0.1:4173", { waitUntil: "networkidle" });
+await page.goto(BASE, { waitUntil: "networkidle" });
 const inputs = page.locator(".field__input");
 await inputs.nth(0).fill("3.041707,101.80142");
 await inputs.nth(1).fill("3.13442,101.68625");
@@ -42,7 +44,7 @@ if (routes > 1) {
 }
 
 // 3. schedule: tomorrow 07:00 via the datetime input
-await page.goto("http://127.0.0.1:4173", { waitUntil: "networkidle" });
+await page.goto(BASE, { waitUntil: "networkidle" });
 await page.locator(".field__input").nth(0).fill("3.041707,101.80142");
 await page.locator(".field__input").nth(1).fill("3.13442,101.68625");
 const tomorrow = new Date(Date.now() + 86400000).toLocaleString("sv-SE").slice(0, 10);
@@ -53,13 +55,13 @@ console.log("SCHEDULED:", (await text()).replace(/\n+/g, " | ").slice(0, 420));
 await page.screenshot({ path: "/root/projects/jalan/pr-assets/router-schedule.png", fullPage: true });
 
 // 4. geolocation button must fail gracefully, not crash
-await page.goto("http://127.0.0.1:4173", { waitUntil: "networkidle" });
+await page.goto(BASE, { waitUntil: "networkidle" });
 await page.locator("button", { hasText: "lokasi" }).click();
 await page.waitForTimeout(1500);
 console.log("GEO:", (await text()).replace(/\n+/g, " | ").slice(0, 300));
 
 // 5. stop board: search a stop, then read its departures
-await page.goto("http://127.0.0.1:4173", { waitUntil: "networkidle" });
+await page.goto(BASE, { waitUntil: "networkidle" });
 await page.locator("button", { hasText: "Jadual hentian" }).click();
 await page.locator(".field__input").fill("KJ477");
 await page.waitForSelector(".stop-hit", { timeout: 8000 });
@@ -67,6 +69,15 @@ await page.locator(".stop-hit").first().click();
 await page.waitForSelector(".dep", { timeout: 8000 });
 console.log("BOARD:", (await text()).replace(/\n+/g, " | ").slice(0, 500));
 await page.screenshot({ path: "/root/projects/jalan/pr-assets/board-departures.png", fullPage: true });
+
+// 6. saved place: star the From field, reload, chip must survive
+await page.goto(BASE, { waitUntil: "networkidle" });
+await page.locator(".field__input").nth(0).fill("3.041707,101.80142");
+await page.locator('button[aria-label="Simpan sebagai Rumah"]').click();
+console.log("SAVED:", await page.locator(".chip").allInnerTexts());
+await page.reload({ waitUntil: "networkidle" });
+console.log("SAVED AFTER RELOAD:", await page.locator(".chip").allInnerTexts());
+console.log("RECENT:", await page.locator(".recent--button").allInnerTexts());
 
 console.log("ERRORS:", errors.length ? errors : "none");
 await browser.close();

@@ -58,7 +58,23 @@ npm run tokens   # regenerate src/styles/tokens.css from design/theme.json
 npm run dev
 npm run audit    # token drift check
 npm run build
+npm run deploy   # build + rsync dist/ to /var/www/jalan (production)
 ```
+
+## Deploy
+
+Production is `https://zhng.tech`: Caddy serves `/var/www/jalan` and proxies `/api/*` to the
+Node API on `127.0.0.1:8795`. The domain is proxied through Cloudflare, so Caddy obtains its
+Let's Encrypt certificate over HTTP-01 (the TLS-ALPN challenge never reaches this machine).
+
+```bash
+npm run deploy
+```
+
+The Caddyfile lives in [`deploy/Caddyfile`](./deploy/Caddyfile). Copy it to `/etc/caddy/Caddyfile`
+and run `systemctl reload caddy` after editing. HTTPS also matters for the app itself: browsers
+only allow `navigator.geolocation` in a secure context, so “Use my location” works on
+`https://zhng.tech` and fails on a plain `http://` IP.
 
 ## Data
 

@@ -4,6 +4,7 @@ import Results from "./screens/Results";
 import Journey from "./screens/Journey";
 import Board from "./screens/Board";
 import { fetchPlans } from "./api";
+import { pushRecent } from "./saved";
 import type { Plan } from "./types";
 
 type Screen = "search" | "results" | "journey" | "board";
@@ -16,12 +17,13 @@ export default function App() {
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState("");
 
-  const search = async (from: string, to: string, fromName?: string, at?: string) => {
+  const search = async (from: string, to: string, fromName?: string, at?: string, toName?: string) => {
     setStatus("loading");
     setMessage("");
     try {
-      const next = await fetchPlans(from, to, { fromName, at });
+      const next = await fetchPlans(from, to, { fromName, toName, at });
       if (!next.length) throw new Error("Tiada laluan / No route found");
+      pushRecent({ from, to, fromName, toName });
       setPlans(next);
       setPlan(next[0]);
       setScreen("results");

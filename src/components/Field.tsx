@@ -1,16 +1,26 @@
+import { useId, type ReactNode } from "react";
+
 type Props = {
   label: string;
   sublabel: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  action?: ReactNode;
 };
 
-export default function Field({ label, sublabel, value, onChange, placeholder }: Props) {
+export default function Field({ label, sublabel, value, onChange, placeholder, action }: Props) {
+  const id = useId();
   return (
-    <label className="field">
-      <span className="eyebrow">{label} / {sublabel}</span>
+    <div className="field">
+      <div className="field__head">
+        <label className="eyebrow" htmlFor={id}>
+          {label} / {sublabel}
+        </label>
+        {action}
+      </div>
       <input
+        id={id}
         className="field__input"
         value={value}
         placeholder={placeholder}
@@ -18,6 +28,6 @@ export default function Field({ label, sublabel, value, onChange, placeholder }:
         autoComplete="off"
         spellCheck={false}
       />
-    </label>
+    </div>
   );
 }

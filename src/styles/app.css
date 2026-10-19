@@ -104,6 +104,56 @@ button {
   outline: none;
 }
 
+.field__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 20px;
+}
+
+.field__star {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-ink-muted);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.field__star--on {
+  color: var(--color-ink);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-hairline);
+  border-radius: 999px;
+  background: none;
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--type-size-xs);
+  letter-spacing: var(--type-tracking-label);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
 .swap {
   position: absolute;
   right: 0;
@@ -347,6 +397,17 @@ button {
 .recent__meta {
   color: var(--color-ink-muted);
   font-variant-numeric: tabular-nums;
+}
+
+.recent--button {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--color-hairline);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
 .footnote {

@@ -1,0 +1,19 @@
+{
+	email admin@zhng.tech
+}
+
+# Production origin. The domain is proxied through Cloudflare, so Let's Encrypt
+# validates over HTTP-01 (TLS-ALPN-01 never reaches this machine).
+zhng.tech, www.zhng.tech {
+	encode zstd gzip
+
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8795
+	}
+
+	handle {
+		root * /var/www/jalan
+		try_files {path} /index.html
+		file_server
+	}
+}

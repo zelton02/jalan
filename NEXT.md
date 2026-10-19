@@ -39,6 +39,9 @@ changes, not when plans are made (plans belong in `BACKLOG.md`).
   count) from the collected positions. The Journey screen shows “BIASA +1′ · 15 SAMPEL” under the
   leg when the hour has at least 8 buckets; the footnote states how many days of history exist.
   As of 2026-10-19 that is **1 day** — treat it as a pipeline that improves, not a verdict.
+- Production is `https://zhng.tech` (Caddy + Let's Encrypt behind Cloudflare). The search screen has
+  a star on each field: it saves the current value as Rumah / Kerja in localStorage, chips fill
+  them back, and the last five successful searches appear under BARU-BARU / RECENT.
 - The UI searches any Malaysian address; the corridor gate is gone.
 - `/api/plans` returns up to 3 itineraries, each forced to start on a different first vehicle;
   the results screen lists them with Tercepat / Alternatif tags.
@@ -57,10 +60,11 @@ Pick one:
 1. **History depth**: only one day is collected so far; the hourly median becomes meaningful at
    ~2 weeks. Meanwhile add a day-of-week split and surface p25/p75 as “biasa 1–7 min”, not a
    single number.
-2. **Saved places / HTTPS**: the “recent” list is static copy; geolocation needs HTTPS to work on a
-   phone. Both are small, both make the app usable daily.
-3. **Cross-state connection quality**: the ETS reaches Bukit Mertajam 11:57 and CT14 leaves 16:54.
+2. **Cross-state connection quality**: the ETS reaches Bukit Mertajam 11:57 and CT14 leaves 16:54.
    Check whether Butterworth + ferry is better, or whether the Penang feed simply lacks trips.
+3. **Walking quality**: access legs are straight-line × 1.3, which can route someone across a
+   highway. Replace the detour constant with a real footpath graph (OSRM/Valhalla) for the first
+   and last 800 m, where it actually changes the answer.
 
 ## Known gaps
 

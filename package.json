@@ -17,6 +17,7 @@
     "live": "node --no-warnings ingest/live.mjs",
     "board": "node --no-warnings ingest/board.mjs",
     "punctual": "node --no-warnings ingest/punctuality.mjs",
+    "deploy": "npm run build && rsync -a --delete dist/ /var/www/jalan/",
     "ui:smoke": "node --no-warnings scripts/ui-smoke.mjs"
   },
   "dependencies": {
