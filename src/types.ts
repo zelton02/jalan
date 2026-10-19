@@ -22,8 +22,10 @@ export type Plan = {
   destination: string;
   depart: string;
   arrive: string;
+  date?: string;
   total_minutes: number;
   source: { feed: string; ingested_at: string | null };
   clock?: string;
+  warning?: string;
   legs: PlanLeg[];
 };

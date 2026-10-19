@@ -41,7 +41,18 @@ if (routes > 1) {
   console.log("ALT JOURNEY:", (await text()).replace(/\n+/g, " | ").slice(0, 400));
 }
 
-// 3. geolocation button must fail gracefully, not crash
+// 3. schedule: tomorrow 07:00 via the datetime input
+await page.goto("http://127.0.0.1:4173", { waitUntil: "networkidle" });
+await page.locator(".field__input").nth(0).fill("3.041707,101.80142");
+await page.locator(".field__input").nth(1).fill("3.13442,101.68625");
+const tomorrow = new Date(Date.now() + 86400000).toLocaleString("sv-SE").slice(0, 10);
+await page.locator('input[type="datetime-local"]').fill(`${tomorrow}T07:00`);
+await page.locator("button", { hasText: "Cari laluan" }).click();
+await page.waitForSelector(".route", { timeout: 20000 });
+console.log("SCHEDULED:", (await text()).replace(/\n+/g, " | ").slice(0, 420));
+await page.screenshot({ path: "/root/projects/jalan/pr-assets/router-schedule.png", fullPage: true });
+
+// 4. geolocation button must fail gracefully, not crash
 await page.goto("http://127.0.0.1:4173", { waitUntil: "networkidle" });
 await page.locator("button", { hasText: "lokasi" }).click();
 await page.waitForTimeout(1500);

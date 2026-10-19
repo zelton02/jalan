@@ -19,7 +19,12 @@ changes, not when plans are made (plans belong in `BACKLOG.md`).
   plan** (was 2–3 s). The first request after boot is ~90 ms because the API warms the JIT.
 - `npm run route -- --from 3.0417,101.8014 --to 3.1344,101.6863 --at 08:00 --rounds 3`
 - `/api/plan?from=&to=&at=&rounds=` accepts an address (Nominatim, cached, 1 req/s) or `lat,lon`.
-  With no params it plans the Sungai Long residence → KL Sentral.
+  With no params it plans the Sungai Long residence → KL Sentral. `at=YYYY-MM-DDTHH:MM` plans a
+  date (service-day aware: a 01:00 trip belongs to the previous service day).
+- The search screen has a BILA / WHEN picker; the results header then reads
+  “Berlepas Sel, 20 Okt · 07:00”. A date outside a core feed's calendar shows a warning instead of
+  silently planning a degraded route.
+- `npm run route -- --from ... --to ... --date 2026-10-21 --at 07:00`
 - The UI searches any Malaysian address; the corridor gate is gone.
 - `/api/plans` returns up to 3 itineraries, each forced to start on a different first vehicle;
   the results screen lists them with Tercepat / Alternatif tags.
@@ -46,13 +51,18 @@ Pick one:
 
 - Walking is straight-line × 1.3 ÷ 75 m/min: no street network, no station egress time. A final
   walk under 30 s is folded into the arrival instead of shown.
-- One itinerary only. RAPTOR keeps the best label per stop and discards the rest.
 - Corridor prune: stops farther than `max(8 km, 35% × direct distance)` from the straight line are
   never expanded. A legitimate wide detour can be hidden by this.
 - Frequency trips use the pattern's template offsets; a per-trip offset difference of a minute is
   not modelled.
 - `kota-bharu` and `kuala-terengganu` are empty upstream.
 - Fares are absent from GTFS; do not promise them.
+- Alternatives are up to 3, found by banning the previous itinerary's first pattern. That is a
+  heuristic, not k-shortest: a genuinely different second-best route that starts on the same first
+  vehicle is invisible.
+- Calendar coverage is uneven: KTMB ends 2026-11-02, mrtfeeder 2026-11-15, rail 2026-12-31, bus
+  2027-03-31. Planning New Year or CNY 2027 works only partially and says so in a warning; it is
+  not a booking-grade answer.
 - No rail realtime — positions are schedule-derived and must never be labelled live.
 
 ## Reading order for a new session

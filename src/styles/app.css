@@ -123,6 +123,26 @@ button {
   margin-bottom: var(--space-4);
 }
 
+.when {
+  position: relative;
+  margin-bottom: var(--space-6);
+}
+
+.when__clear {
+  position: absolute;
+  right: 32px;
+  bottom: var(--space-4);
+  border: 0;
+  background: none;
+  padding: var(--space-1);
+  color: var(--color-ink-muted);
+  font: inherit;
+  font-size: var(--type-size-xs);
+  letter-spacing: var(--type-tracking-label);
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;

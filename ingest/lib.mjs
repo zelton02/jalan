@@ -41,6 +41,19 @@ export function dayBefore(ymd) {
   };
 }
 
+/** "2026-10-20" or "20261020" → { ymd, weekday }; null when it is not a real date. */
+export function ymdInfo(input) {
+  const m = /^(\d{4})-?(\d{2})-?(\d{2})$/.exec(String(input ?? ""));
+  if (!m) return null;
+  const y = Number(m[1]), mo = Number(m[2]), d = Number(m[3]);
+  const date = new Date(Date.UTC(y, mo - 1, d));
+  if (date.getUTCFullYear() !== y || date.getUTCMonth() !== mo - 1 || date.getUTCDate() !== d) return null;
+  return {
+    ymd: `${y}${pad(mo)}${pad(d)}`,
+    weekday: ["sun", "mon", "tue", "wed", "thu", "fri", "sat"][date.getUTCDay()],
+  };
+}
+
 export const openDb = (path) => new DatabaseSync(path, { readOnly: true });
 
 export function metaMap(db) {

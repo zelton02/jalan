@@ -1,5 +1,6 @@
 import LineBadge from "../components/LineBadge";
 import Button from "../components/Button";
+import Alert from "../components/Alert";
 import { lineShort } from "../data/lines";
 import type { Plan } from "../types";
 
@@ -11,6 +12,15 @@ export default function Results({ plans, onBack, onSelect }: Props) {
     ? new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kuala_Lumpur", dateStyle: "short", timeStyle: "short" }).format(new Date(best.source.ingested_at))
     : "—";
 
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kuala_Lumpur" }).format(new Date());
+  const scheduled = best.clock?.startsWith("scheduled") ?? false;
+  const dayLabel = best.date
+    ? best.date === today
+      ? "hari ini / today"
+      : new Intl.DateTimeFormat("ms-MY", { timeZone: "Asia/Kuala_Lumpur", weekday: "short", day: "numeric", month: "short" }).format(new Date(`${best.date}T00:00:00+08:00`))
+    : "";
+  const whenLabel = scheduled ? `Berlepas ${dayLabel} · ${best.depart}` : null;
+
   return (
     <div className="screen">
       <header className="topbar">
@@ -20,8 +30,11 @@ export default function Results({ plans, onBack, onSelect }: Props) {
         <div>
           <div className="eyebrow">{best.origin.toUpperCase()} → {best.destination.toUpperCase()}</div>
           <h1 className="h2">{plans.length} laluan / routes</h1>
+          {whenLabel ? <div className="route__meta">{whenLabel}</div> : null}
         </div>
       </header>
+
+      {best.warning ? <Alert>{best.warning}</Alert> : null}
 
       <ul className="plain-list">
         {plans.map((plan, index) => {
@@ -51,7 +64,7 @@ export default function Results({ plans, onBack, onSelect }: Props) {
       </ul>
 
       <p className="footnote">
-        Jadual: {ingested} MYT{best.clock?.startsWith("pinned") ? ` · demo clock ${best.clock.slice(7)}` : ""} · {plans.length} laluan.
+        Jadual: {ingested} MYT · {plans.length} laluan.
       </p>
     </div>
   );

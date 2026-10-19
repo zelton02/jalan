@@ -7,7 +7,7 @@
 //
 // The response keeps the same leg shape as lib.planDoorToDoor so the client does
 // not change when the engine is swapped.
-import { activeServices, dayBefore, klNow, hhmm, metaMap } from "./lib.mjs";
+import { activeServices, dayBefore, klNow, hhmm, metaMap, ymdInfo } from "./lib.mjs";
 
 const WALK_SPEED_M_MIN = 75;   // average walking pace
 const DETOUR = 1.3;            // straight line -> street network
@@ -228,14 +228,23 @@ function earliestDeparture(entry, idx, boardSec) {
  * @param opts.atSec     departure time in seconds (defaults to now, KL)
  * @param opts.maxRounds vehicles allowed (1 = direct, 2 = one transfer, ...)
  */
-export function planJourney(db, { from, to, atSec, maxRounds = 3, index, bannedFirstPatterns }) {
+export function planJourney(db, { from, to, atSec, date, maxRounds = 3, index, bannedFirstPatterns }) {
   const idx = index ?? buildIndex(db);
   const now = atSec ?? klNow().seconds;
-  const kl = klNow();
 
-  const dates = [{ ymd: kl.ymd, weekday: kl.weekday, dayOffset: 0 }];
-  if (now < SERVICE_DAY_CUTOFF) {
-    dates.unshift({ ...dayBefore(kl.ymd), dayOffset: 86400 });
+  let dates;
+  if (date) {
+    const info = typeof date === "string" ? ymdInfo(date) : date;
+    if (!info) throw new Error(`bad date: ${date}`);
+    // A trip before 04:00 belongs to the previous service day; shift the absolute clock by a
+    // day so it still sorts after the previous evening's trips.
+    dates = now < SERVICE_DAY_CUTOFF
+      ? [{ ...dayBefore(info.ymd), dayOffset: 86400 }]
+      : [{ ...info, dayOffset: 0 }];
+  } else {
+    const kl = klNow();
+    dates = [{ ymd: kl.ymd, weekday: kl.weekday, dayOffset: 0 }];
+    if (now < SERVICE_DAY_CUTOFF) dates.unshift({ ...dayBefore(kl.ymd), dayOffset: 86400 });
   }
 
   let best = null;
@@ -248,7 +257,13 @@ export function planJourney(db, { from, to, atSec, maxRounds = 3, index, bannedF
     // Compare numeric arrivals; "00:10" sorts after "23:50" as a string.
     if (result && (!best || result._arrive < best._arrive)) best = result;
   }
-  if (best) delete best._arrive;
+  if (best) {
+    const ymd = best._ymd;
+    delete best._arrive;
+    delete best._ymd;
+    // The client needs to know which service day won (a 01:00 trip belongs to yesterday).
+    best.date = `${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}`;
+  }
   return best;
 }
 
@@ -511,6 +526,7 @@ function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, day
     source: { feed: "router", ingested_at: metaMap(db)["rail:ingested_at"] ?? null },
     legs,
     _arrive: target.arrive,
+    _ymd: ymd,
     _debug: {
       rounds: chain.filter((n) => n.parent?.type === "ride").length,
       destinationWalkMeters: Math.round(target.meters),

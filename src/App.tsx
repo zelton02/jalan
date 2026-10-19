@@ -15,11 +15,11 @@ export default function App() {
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState("");
 
-  const search = async (from: string, to: string, fromName?: string) => {
+  const search = async (from: string, to: string, fromName?: string, at?: string) => {
     setStatus("loading");
     setMessage("");
     try {
-      const next = await fetchPlans(from, to, { fromName });
+      const next = await fetchPlans(from, to, { fromName, at });
       if (!next.length) throw new Error("Tiada laluan / No route found");
       setPlans(next);
       setPlan(next[0]);

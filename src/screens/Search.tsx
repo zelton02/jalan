@@ -3,14 +3,16 @@ import Field from "../components/Field";
 import Button from "../components/Button";
 import Alert from "../components/Alert";
 
-type Props = { onSearch: (from: string, to: string, fromName?: string) => void; loading: boolean; error: string | null };
+type Props = { onSearch: (from: string, to: string, fromName?: string, at?: string) => void; loading: boolean; error: string | null };
 
 export default function Search({ onSearch, loading, error }: Props) {
   const [from, setFrom] = useState("Sungai Long");
   const [to, setTo] = useState("KL Sentral");
   const [fromName, setFromName] = useState<string | undefined>();
+  const [when, setWhen] = useState("");
   const [locating, setLocating] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
+  const minWhen = new Date().toLocaleString("sv-SE").slice(0, 16).replace(" ", "T");
 
   const locate = () => {
     setGeoError(null);
@@ -58,10 +60,28 @@ export default function Search({ onSearch, loading, error }: Props) {
         {locating ? "Mencari lokasi… / Locating…" : "◎ Guna lokasi saya / Use my location"}
       </Button>
 
+      <div className="when">
+        <label className="field">
+          <span className="eyebrow">BILA / WHEN</span>
+          <input
+            className="field__input"
+            type="datetime-local"
+            value={when}
+            min={minWhen}
+            onChange={(event) => setWhen(event.target.value)}
+          />
+        </label>
+        {when ? (
+          <button type="button" className="when__clear" onClick={() => setWhen("")}>
+            Sekarang
+          </button>
+        ) : null}
+      </div>
+
       {geoError ? <Alert>{geoError}</Alert> : null}
       {error ? <Alert>{error}</Alert> : null}
 
-      <Button variant="primary" block onClick={() => onSearch(from, to, fromName)} disabled={loading}>
+      <Button variant="primary" block onClick={() => onSearch(from, to, fromName, when || undefined)} disabled={loading}>
         {loading ? "Mencari… / Searching…" : "Cari laluan / Find routes"}
       </Button>
       <p className="footnote">Mana-mana alamat di Malaysia. / Any address in Malaysia.</p>

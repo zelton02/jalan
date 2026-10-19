@@ -14,7 +14,7 @@
 import { createServer } from "node:http";
 import { statSync } from "node:fs";
 import { resolve } from "node:path";
-import { openDb, metaMap } from "./lib.mjs";
+import { openDb, metaMap, klNow, ymdInfo, hhmm } from "./lib.mjs";
 import { buildIndex, planJourney, planAlternatives } from "./router.mjs";
 import { geocode } from "./geocode.mjs";
 
@@ -25,11 +25,17 @@ const pinned = atArg ? (() => { const [h, m] = atArg.split(":").map(Number); ret
 
 const DB_PATH = resolve("data/jalan.db");
 let db, dbMtime, index;
+let coverage = [];
+let coverageMax = null;
 
 function load() {
   db = openDb(DB_PATH);
   dbMtime = statSync(DB_PATH).mtimeMs;
   index = buildIndex(db);
+  coverage = db.prepare(
+    "SELECT feed, MIN(start_date) mn, MAX(end_date) mx FROM calendar GROUP BY feed"
+  ).all().map((r) => ({ feed: r.feed, min: r.mn, max: r.mx }));
+  coverageMax = coverage.reduce((m, c) => (c.max > m ? c.max : m), "");
 }
 load();
 
@@ -69,6 +75,61 @@ const parseHHMM = (value) => {
   return m ? Number(m[1]) * 3600 + Number(m[2]) * 60 : null;
 };
 
+const dash = (ymd) => (ymd ? `${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}` : null);
+
+/**
+ * `at=2026-10-20T07:00` (datetime-local), `date=2026-10-20&at=07:00`, or `at=07:00` (today,
+ * used as a demo clock). With nothing, fall back to the server-level --at pin or now.
+ */
+function parseWhen(params) {
+  const atRaw = params.get("at");
+  const dateRaw = params.get("date");
+
+  if (atRaw && atRaw.includes("T")) {
+    const [d, t] = atRaw.split("T");
+    const info = ymdInfo(d);
+    const atSec = parseHHMM(t);
+    if (!info) return { error: "Format tarikh salah. / Bad date." };
+    if (atSec == null) return { error: "Format masa salah. / Bad time." };
+    return { date: info.ymd, atSec };
+  }
+  if (dateRaw) {
+    const info = ymdInfo(dateRaw);
+    if (!info) return { error: "Format tarikh salah. / Bad date." };
+    const atSec = atRaw ? parseHHMM(atRaw) : pinned;
+    if (atRaw && atSec == null) return { error: "Format masa salah. / Bad time." };
+    return { date: info.ymd, atSec };
+  }
+  if (atRaw) {
+    const atSec = parseHHMM(atRaw);
+    if (atSec == null) return { error: "Format masa salah. / Bad time." };
+    return { date: null, atSec };
+  }
+  return { date: null, atSec: pinned };
+}
+
+function checkDate(ymd) {
+  if (!ymd) return null;
+  if (ymd < klNow().ymd) return "Tarikh sudah lepas. / That date has passed.";
+  if (coverageMax && ymd > coverageMax) {
+    return `Data jadual hanya sampai ${dash(coverageMax)}. / Timetable data ends ${dash(coverageMax)}.`;
+  }
+  return null;
+}
+
+// A trip can still be planned when one feed has no calendar rows for the date, but the result
+// is incomplete (e.g. rail absent -> a bus-only route that looks slower for no visible reason).
+const CORE_FEEDS = ["bus", "rail", "mrtfeeder"];
+function coverageWarning(ymd) {
+  if (!ymd) return null;
+  const missing = coverage
+    .filter((c) => CORE_FEEDS.includes(c.feed) && (ymd < c.min || ymd > c.max))
+    .map((c) => c.feed);
+  return missing.length
+    ? `Jadual ${missing.join(", ")} tiada untuk tarikh ini — laluan mungkin tidak lengkap. / No ${missing.join(", ")} timetable for this date.`
+    : null;
+}
+
 const DEFAULT_FROM = { lat: 3.041707, lon: 101.80142, name: "Sungai Long" };
 const DEFAULT_TO = { lat: 3.13442, lon: 101.68625, name: "KL Sentral" };
 
@@ -97,12 +158,16 @@ async function handlePlan(url, res, mode = "plan") {
   if (!from) return json(res, 404, { error: "Lokasi asal tidak dijumpai. / Origin not found." });
   if (!to) return json(res, 404, { error: "Destinasi tidak dijumpai. / Destination not found." });
 
-  const requestedAt = parseHHMM(url.searchParams.get("at") ?? atArg);
-  const atSec = requestedAt ?? pinned ?? undefined;
+  const when = parseWhen(url.searchParams);
+  if (when.error) return json(res, 400, { error: when.error });
+  const dateError = checkDate(when.date);
+  if (dateError) return json(res, 400, { error: dateError });
+
+  const atSec = when.atSec ?? undefined;
   const rounds = Math.min(5, Math.max(1, Number(url.searchParams.get("rounds") ?? 3) || 3));
   const count = Math.min(3, Math.max(1, Number(url.searchParams.get("count") ?? 3) || 3));
 
-  const key = `${mode}|${from.lat},${from.lon}|${to.lat},${to.lon}|${atSec ?? "live"}|${rounds}|${mode === "plans" ? count : 1}|${dbMtime}`;
+  const key = `${mode}|${from.lat},${from.lon}|${to.lat},${to.lon}|${when.date ?? "auto"}|${atSec ?? "live"}|${rounds}|${mode === "plans" ? count : 1}|${dbMtime}`;
   const cached = planCache.get(key);
   // A live plan goes stale within minutes; only a pinned clock is safe to keep.
   const fresh = cached && (atSec != null || Date.now() - cached.at < 30_000);
@@ -111,19 +176,28 @@ async function handlePlan(url, res, mode = "plan") {
   let plans;
   if (mode === "plans") {
     plans = withDb((current) => planAlternatives(
-      current, { from, to, atSec, maxRounds: rounds, index }, { count }
+      current, { from, to, atSec, date: when.date, maxRounds: rounds, index }, { count }
     ));
   } else {
-    const one = withDb((current) => planJourney(current, { from, to, atSec, maxRounds: rounds, index }));
+    const one = withDb((current) => planJourney(current, { from, to, atSec, date: when.date, maxRounds: rounds, index }));
     plans = one ? [one] : [];
   }
   if (!plans.length) {
     return json(res, 404, { error: "Tiada laluan pada waktu ini. / No route at this time." });
   }
 
-  const clock = requestedAt != null || pinned != null ? `pinned ${atArg ?? url.searchParams.get("at")}` : "live";
+  const clock = when.date
+    ? `scheduled ${dash(when.date)}${atSec != null ? ` ${hhmm(atSec)}` : ""}`
+    : atSec != null ? `pinned ${hhmm(atSec)}` : "live";
+  const warning = coverageWarning(when.date);
   const clean = plans.map(({ _debug, ...rest }) => rest);
-  const payload = mode === "plans" ? { plans: clean, clock } : { ...clean[0], clock };
+  const payload = mode === "plans"
+    ? {
+        plans: clean.map((plan) => ({ ...plan, clock, ...(warning ? { warning } : {}) })),
+        clock,
+        ...(warning ? { warning } : {}),
+      }
+    : { ...clean[0], clock, ...(warning ? { warning } : {}) };
   planCache.set(key, { payload, at: Date.now() });
   if (planCache.size > 200) planCache.delete(planCache.keys().next().value);
   json(res, 200, payload);
