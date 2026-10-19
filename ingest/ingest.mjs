@@ -14,6 +14,7 @@ import { dirname, join, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { FEEDS } from "./feeds.mjs";
 import { parseCsvObjects } from "./csv.mjs";
+import { buildPatterns } from "./patterns.mjs";
 
 const args = process.argv.slice(2);
 const force = args.includes("--force");
@@ -147,6 +148,10 @@ function main(feeds) {
     log(`  ${feed.key}: ${JSON.stringify(counts)}`);
   }
   db.exec("COMMIT");
+
+  // Precompute the trip patterns the router scans per round. Built into the same
+  // file so the atomic rename below publishes data and index together.
+  buildPatterns(db, { log });
 
   const total = db.prepare("SELECT COUNT(*) AS n FROM stop_times").get().n;
   insMeta.run("total_stop_times", String(total));

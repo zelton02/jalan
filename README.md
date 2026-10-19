@@ -31,7 +31,11 @@ npm run ingest                                  # download 3 feeds -> data/jalan
 npm run next -- --stop KG31 --dir north         # next MRT at Bukit Dukung
 npm run next -- --feed ktmb --stop Kajang --at 08:00
 npm run next -- --stop KG31 --dir north --json  # machine-readable
+npm run route -- --from 3.0417,101.8014 --to 3.1344,101.6863 --at 08:00
 ```
+
+The router (round-based RAPTOR over precomputed patterns) plans any A→B point. `npm run ingest`
+rebuilds the `patterns` / `pattern_trips` tables in the same atomic swap as the raw GTFS tables.
 
 See [`DATA.md`](./DATA.md) for sources, refresh cadence, and the known limitations
 (frequency-based rail feed, no official delay feed, dirty fields).
@@ -53,5 +57,6 @@ npm run build
 
 ## Data
 
-All routes, times, fares and line colours are **sample data**. Line colours approximate the
-real Klang Valley lines but are not official brand assets.
+Routes, stops, and times come from the official `data.gov.my` GTFS feeds (see
+[`DATA.md`](./DATA.md)). Line colours approximate the real Klang Valley lines but are not
+official brand assets. Fares are not published in GTFS, so the app does not show them.

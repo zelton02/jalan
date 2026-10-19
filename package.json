@@ -13,6 +13,7 @@
     "next": "node --no-warnings ingest/next.mjs",
     "door": "node --no-warnings ingest/door.mjs",
     "route": "node --no-warnings ingest/route.mjs",
+    "patterns": "node --no-warnings ingest/patterns.mjs",
     "ui:smoke": "node --no-warnings scripts/ui-smoke.mjs"
   },
   "dependencies": {

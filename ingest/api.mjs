@@ -116,6 +116,15 @@ async function handlePlan(url, res) {
   json(res, 200, payload);
 }
 
+// Warm the JIT and the per-day caches so the first real request is not ~1s slower.
+try {
+  const started = performance.now();
+  planJourney(db, { from: DEFAULT_FROM, to: DEFAULT_TO, atSec: 8 * 3600, index });
+  console.log(`[api] warmup ${Math.round(performance.now() - started)} ms`);
+} catch (error) {
+  console.error("[api] warmup failed:", error.message);
+}
+
 createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   try {

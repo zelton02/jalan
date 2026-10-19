@@ -1,12 +1,13 @@
-// Round-based (RAPTOR-lite) journey planner over the SQLite GTFS store.
+// Round-based (RAPTOR) journey planner over the SQLite GTFS store.
 //
-// Input is a pair of coordinates, not a hardcoded corridor. Each round boards one
-// vehicle; every stop reached by a trip is labelled with the earliest arrival and
-// the ride that produced it, then the next round boards from that frontier.
+// The search scans precomputed *patterns* — one ordered stop list per
+// route+direction — instead of asking SQLite for departures at every reached
+// stop. 19k trips collapse into ~650 patterns, so a round is ~650 in-memory
+// scans rather than ~1,500 SQL queries over 80k rows.
 //
 // The response keeps the same leg shape as lib.planDoorToDoor so the client does
 // not change when the engine is swapped.
-import { activeServices, dayBefore, klNow, hhmm, sec, metaMap } from "./lib.mjs";
+import { activeServices, dayBefore, klNow, hhmm, metaMap } from "./lib.mjs";
 
 const WALK_SPEED_M_MIN = 75;   // average walking pace
 const DETOUR = 1.3;            // straight line -> street network
@@ -38,7 +39,13 @@ const lineIdFor = (feed, routeId) => {
   return "bus";
 };
 
-/** Stops, a lat/lon grid, and walking distances. Built once per DB handle. */
+const toSec = (t) => {
+  if (!t) return null;
+  const [h, m, s] = t.split(":").map(Number);
+  return h * 3600 + m * 60 + (s || 0);
+};
+
+/** Stops, a lat/lon grid, walking distances, and the pattern index. Built once per DB handle. */
 export function buildIndex(db) {
   const stops = db.prepare(
     "SELECT feed, stop_id, stop_name, lat, lon FROM stops WHERE lat IS NOT NULL AND lon IS NOT NULL"
@@ -87,161 +94,130 @@ export function buildIndex(db) {
     return list;
   };
 
-  return { stops, byKey, near, neighbours };
+  const routes = new Map(
+    db.prepare("SELECT feed, route_id, short_name, long_name FROM routes")
+      .all().map((r) => [`${r.feed}|${r.route_id}`, r])
+  );
+
+  const freqs = new Map();
+  for (const f of db.prepare(
+    "SELECT feed, trip_id, start_time, end_time, headway_secs FROM frequencies"
+  ).all()) {
+    const key = `${f.feed}|${f.trip_id}`;
+    const window = { start: toSec(f.start_time), end: toSec(f.end_time), step: f.headway_secs };
+    const list = freqs.get(key);
+    if (list) list.push(window);
+    else freqs.set(key, [window]);
+  }
+
+  const patterns = [];
+  const byId = new Map();
+  for (const r of db.prepare(
+    "SELECT pattern_id, feed, route_id, direction_id, headsign, stops, offsets FROM patterns ORDER BY pattern_id"
+  ).all()) {
+    const stopIds = JSON.parse(r.stops);
+    const offsets = JSON.parse(r.offsets);
+    const base = offsets[0][1]; // departure at the first stop
+    const pattern = {
+      id: r.pattern_id,
+      feed: r.feed,
+      routeId: r.route_id,
+      directionId: r.direction_id,
+      headsign: r.headsign,
+      stopIds,
+      stopKeys: stopIds.map((id) => `${r.feed}|${id}`),
+      relArr: offsets.map((o) => o[0] - base),
+      relDep: offsets.map((o) => o[1] - base),
+      scheduled: [],
+      frequency: [],
+      route: routes.get(`${r.feed}|${r.route_id}`) ?? null,
+    };
+    patterns.push(pattern);
+    byId.set(pattern.id, pattern);
+  }
+
+  for (const t of db.prepare(
+    "SELECT pattern_id, feed, trip_id, service_id, first_dep FROM pattern_trips ORDER BY first_dep"
+  ).all()) {
+    const pattern = byId.get(t.pattern_id);
+    if (!pattern) continue;
+    const trip = {
+      tripId: t.trip_id,
+      serviceId: t.service_id,
+      firstDep: t.first_dep,
+      freq: freqs.get(`${t.feed}|${t.trip_id}`) ?? null,
+    };
+    (trip.freq ? pattern.frequency : pattern.scheduled).push(trip);
+  }
+
+  // stop -> every pattern that calls there, with the position on the pattern
+  const patternsAtStop = new Map();
+  for (const pattern of patterns) {
+    for (let i = 0; i < pattern.stopKeys.length; i++) {
+      const key = pattern.stopKeys[i];
+      const entry = { pattern, idx: i };
+      const list = patternsAtStop.get(key);
+      if (list) list.push(entry);
+      else patternsAtStop.set(key, [entry]);
+    }
+  }
+
+  return { stops, byKey, near, neighbours, patterns, patternsAtStop };
 }
 
-/** Per-service-day query context: active services, trip times, frequencies, route names. */
+/** Per-service-day view: only patterns with a trip running today, only those trips. */
 function makeContext(db, index, ymd, weekday) {
   const servicesCache = new Map();
-  const tripsCache = new Map();
-  const freqCache = new Map();
-  const routeCache = new Map();
-  const stats = { stopsExpanded: 0, departureCalls: 0, rowsScanned: 0, ridesLoaded: 0, rideCalls: 0, msDepartures: 0, msRide: 0, msFoot: 0 };
-
-  const stmtStopTimes = db.prepare(
-    `SELECT st.trip_id, st.stop_sequence, st.arrival, st.departure,
-            t.route_id, t.direction_id, t.headsign, t.service_id
-     FROM stop_times st
-     JOIN trips t ON t.feed = st.feed AND t.trip_id = st.trip_id
-     WHERE st.feed = ? AND st.stop_id = ?`
-  );
-  const stmtTrip = db.prepare(
-    `SELECT stop_id, stop_sequence, arrival, departure
-     FROM stop_times WHERE feed = ? AND trip_id = ? ORDER BY stop_sequence`
-  );
-  const stmtFreq = db.prepare(
-    "SELECT start_time, end_time, headway_secs FROM frequencies WHERE feed = ? AND trip_id = ?"
-  );
-  const stmtRoute = db.prepare(
-    "SELECT short_name, long_name, route_type FROM routes WHERE feed = ? AND route_id = ?"
-  );
-
   const servicesFor = (feed) => {
     if (!servicesCache.has(feed)) servicesCache.set(feed, activeServices(db, feed, ymd, weekday));
     return servicesCache.get(feed);
   };
 
-  const tripTimes = (feed, tripId) => {
-    const key = `${feed}|${tripId}`;
-    let times = tripsCache.get(key);
-    if (!times) {
-      times = stmtTrip.all(feed, tripId).map((t) => ({
-        stopId: t.stop_id,
-        seq: t.stop_sequence,
-        arr: sec(t.arrival),
-        dep: sec(t.departure),
-      }));
-      tripsCache.set(key, times);
+  const active = [];
+  for (const pattern of index.patterns) {
+    const services = servicesFor(pattern.feed);
+    if (!services.size) continue;
+    const scheduled = pattern.scheduled.filter((t) => services.has(t.serviceId));
+    const frequency = pattern.frequency.filter((t) => services.has(t.serviceId));
+    if (!scheduled.length && !frequency.length) continue;
+    active.push({ pattern, scheduled, frequency });
+  }
+
+  const byId = new Map(active.map((entry) => [entry.pattern.id, entry]));
+  const stats = { patterns: active.length, candidates: 0, rides: 0 };
+  return { servicesFor, active, byId, stats };
+}
+
+/** Earliest departure of a pattern at stop index `idx` at or after `boardSec`. */
+function earliestDeparture(entry, idx, boardSec) {
+  const { pattern, scheduled, frequency } = entry;
+  const relDep = pattern.relDep[idx];
+  let best = null;
+
+  // Scheduled trips are sorted by first departure: binary search the first usable one.
+  let lo = 0, hi = scheduled.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (scheduled[mid].firstDep + relDep < boardSec) lo = mid + 1;
+    else hi = mid;
+  }
+  if (lo < scheduled.length) {
+    const trip = scheduled[lo];
+    best = { trip, T: trip.firstDep, dep: trip.firstDep + relDep };
+  }
+
+  // Frequency templates expand to a departure inside each window.
+  for (const trip of frequency) {
+    for (const w of trip.freq) {
+      if (w.start == null || w.end == null || !w.step) continue;
+      const k = Math.max(0, Math.ceil((boardSec - relDep - w.start) / w.step));
+      const T = w.start + k * w.step;
+      if (T > w.end) continue;
+      const dep = T + relDep;
+      if (!best || dep < best.dep) best = { trip, T, dep };
     }
-    return times;
-  };
-
-  const freqsFor = (feed, tripId) => {
-    const key = `${feed}|${tripId}`;
-    let freqs = freqCache.get(key);
-    if (!freqs) {
-      freqs = stmtFreq.all(feed, tripId).map((f) => ({
-        start: sec(f.start_time), end: sec(f.end_time), step: f.headway_secs,
-      }));
-      freqCache.set(key, freqs);
-    }
-    return freqs;
-  };
-
-  const routeFor = (feed, routeId) => {
-    const key = `${feed}|${routeId}`;
-    let route = routeCache.get(key);
-    if (route === undefined) {
-      route = stmtRoute.get(feed, routeId) ?? null;
-      routeCache.set(key, route);
-    }
-    return route;
-  };
-
-  /**
-   * Earliest vehicle departure per (route, direction, headsign) from one stop at or
-   * after `boardSec`. Grouping by line keeps the search cheap and matches RAPTOR's
-   * "board the first vehicle of each line" rule.
-   */
-  const earliestDepartures = (stop, boardSec) => {
-    stats.stopsExpanded++;
-    const t0 = performance.now();
-    const services = servicesFor(stop.feed);
-    if (!services.size) return [];
-    const rows = stmtStopTimes.all(stop.feed, stop.id);
-    stats.departureCalls++;
-    stats.rowsScanned += rows.length;
-    const best = new Map();
-
-    for (const row of rows) {
-      if (!services.has(row.service_id)) continue;
-      const dep = sec(row.departure);
-      if (dep == null) continue;
-      const freqs = freqsFor(stop.feed, row.trip_id);
-      let next = null;
-      if (freqs.length) {
-        const times = tripTimes(stop.feed, row.trip_id);
-        const first = times.length ? times[0].dep : null;
-        if (first == null) continue;
-        const offset = dep - first;
-        for (const f of freqs) {
-          if (f.start == null || f.end == null || !f.step) continue;
-          const k = Math.max(0, Math.ceil((boardSec - offset - f.start) / f.step));
-          const candidate = f.start + k * f.step;
-          if (candidate <= f.end && (next == null || candidate + offset < next)) next = candidate + offset;
-        }
-      } else if (dep >= boardSec) {
-        next = dep;
-      }
-      if (next == null) continue;
-
-      const key = `${row.route_id}|${row.direction_id}|${row.headsign ?? ""}`;
-      const prev = best.get(key);
-      if (!prev || next < prev.dep) {
-        best.set(key, {
-          feed: stop.feed,
-          tripId: row.trip_id,
-          seq: row.stop_sequence,
-          dep: next,
-          routeId: row.route_id,
-          directionId: row.direction_id,
-          headsign: row.headsign,
-        });
-      }
-    }
-    stats.msDepartures += performance.now() - t0;
-    return [...best.values()];
-  };
-
-  /**
-   * All stops after the boarding stop on that exact trip, with the actual clock
-   * times (frequency templates shifted by the chosen departure).
-   */
-  const rideFrom = (board) => {
-    stats.rideCalls++;
-    const t0 = performance.now();
-    const times = tripTimes(board.feed, board.tripId);
-    if (!times.length) stats.ridesLoaded++;
-    const idx = times.findIndex((t) => t.seq === board.seq);
-    if (idx < 0) return [];
-    const shift = board.dep - times[idx].dep;
-    const out = [];
-    for (let i = idx; i < times.length; i++) {
-      const t = times[i];
-      const stop = index.byKey.get(`${board.feed}|${t.stopId}`);
-      if (!stop) continue;
-      out.push({
-        stop,
-        arr: (t.arr ?? t.dep) + shift,
-        dep: t.dep == null ? null : t.dep + shift,
-        seq: t.seq,
-      });
-    }
-    stats.msRide += performance.now() - t0;
-    return out;
-  };
-
-  return { ymd, weekday, servicesFor, tripTimes, earliestDepartures, rideFrom, routeFor, stats };
+  }
+  return best;
 }
 
 /**
@@ -268,8 +244,10 @@ export function planJourney(db, { from, to, atSec, maxRounds = 3, index }) {
     const result = runRaptor(db, idx, {
       from, to, startSec, maxRounds, ymd: date.ymd, weekday: date.weekday, dayOffset: date.dayOffset,
     });
-    if (result && (!best || result.arrive < best.arrive)) best = result;
+    // Compare numeric arrivals; "00:10" sorts after "23:50" as a string.
+    if (result && (!best || result._arrive < best._arrive)) best = result;
   }
+  if (best) delete best._arrive;
   return best;
 }
 
@@ -302,33 +280,53 @@ function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, day
 
   for (let round = 1; round <= maxRounds && frontier.length; round++) {
     const improved = new Map();
-    const riddenThisRound = new Set();
+    const ridden = new Map(); // pattern|trip|T -> lowest boarding index already expanded
     frontier.sort((a, b) => a.arr - b.arr);
 
     for (const label of frontier) {
+      const at = index.patternsAtStop.get(label.stop.key);
+      if (!at) continue;
       const boardSec = label.arr + (round > 1 ? TRANSFER_PENALTY_SEC : 0);
-      for (const departure of ctx.earliestDepartures(label.stop, boardSec)) {
-        // Riding a trip again in the same round can only arrive later at every
-        // downstream stop than the first boarding already did.
-        const tripKey = `${departure.feed}|${departure.tripId}`;
-        if (riddenThisRound.has(tripKey)) continue;
-        riddenThisRound.add(tripKey);
-        const ride = ctx.rideFrom(departure);
-        for (let i = 1; i < ride.length; i++) {
-          const call = ride[i];
-          if (offCorridor(call.stop)) continue;
-          const current = labels.get(call.stop.key);
-          if (current && current.arr <= call.arr) continue;
-          const parent = {
-            type: "ride", prev: label, feed: departure.feed,
-            tripId: departure.tripId, routeId: departure.routeId,
-            headsign: departure.headsign, dep: ride[0].dep ?? departure.dep,
-            arr: call.arr, path: ride, toIdx: i,
+
+      for (const { pattern, idx } of at) {
+        const entry = ctx.byId.get(pattern.id);
+        if (!entry) continue;
+        const best = earliestDeparture(entry, idx, boardSec);
+        if (!best) continue;
+        ctx.stats.candidates++;
+
+        // Boarding the same vehicle again further along only arrives later; boarding
+        // it earlier covers more stops. Re-ride only when a lower index shows up.
+        const rideKey = `${pattern.id}|${best.trip.tripId}|${best.T}`;
+        const seen = ridden.get(rideKey);
+        if (seen != null && seen <= idx) continue;
+        ridden.set(rideKey, idx);
+        ctx.stats.rides++;
+
+        for (let j = idx + 1; j < pattern.stopKeys.length; j++) {
+          const stopKey = pattern.stopKeys[j];
+          const stop = index.byKey.get(stopKey);
+          if (!stop || offCorridor(stop)) continue;
+          const arr = best.T + pattern.relArr[j];
+          const current = labels.get(stopKey);
+          if (current && current.arr <= arr) continue;
+          const next = {
+            stop, arr, round,
+            parent: {
+              type: "ride",
+              prev: label,
+              pattern,
+              tripId: best.trip.tripId,
+              T: best.T,
+              fromIdx: idx,
+              toIdx: j,
+              dep: best.dep,
+              arr,
+            },
           };
-          const next = { stop: call.stop, arr: call.arr, round, parent };
-          labels.set(call.stop.key, next);
-          const known = improved.get(call.stop.key);
-          if (!known || call.arr < known.arr) improved.set(call.stop.key, next);
+          labels.set(stopKey, next);
+          const known = improved.get(stopKey);
+          if (!known || arr < known.arr) improved.set(stopKey, next);
         }
       }
     }
@@ -381,7 +379,7 @@ function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, day
   for (const node of chain) {
     const p = node.parent;
     if (!p) continue;
-    const start = node.arr - (p.secs ?? (p.arr - p.dep));
+    const start = p.type === "ride" ? p.dep : node.arr - p.secs;
     if (p.type === "walk") {
       legs.push({
         kind: "walk",
@@ -399,25 +397,25 @@ function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, day
         subtitle: `${p.to.name} · ${Math.round(p.meters)} m`,
       });
     } else if (p.type === "ride") {
-      const route = ctx.routeFor(p.feed, p.routeId);
-      const label = route?.short_name || route?.long_name || p.routeId;
-      const slice = p.path.slice(0, p.toIdx + 1);
-      const stations = slice.map((call, i) => ({
-        name: call.stop.name,
-        time: hhmm((i === 0 ? call.dep ?? call.arr : call.arr) - dayOffset),
-      }));
+      const label = p.pattern.route?.short_name || p.pattern.route?.long_name || p.pattern.routeId;
+      const stations = [];
+      for (let j = p.fromIdx; j <= p.toIdx; j++) {
+        const name = index.byKey.get(p.pattern.stopKeys[j])?.name ?? p.pattern.stopIds[j];
+        const rel = j === p.fromIdx ? p.pattern.relDep[j] : p.pattern.relArr[j];
+        stations.push({ name, time: hhmm(p.T + rel - dayOffset) });
+      }
       legs.push({
         kind: "ride",
         start: hhmm(p.dep - dayOffset),
         duration: `${Math.max(1, Math.round((p.arr - p.dep) / 60))} min`,
-        title: `${label} ke ${slice[slice.length - 1].stop.name}`,
-        line: lineIdFor(p.feed, p.routeId),
+        title: `${label} ke ${stations[stations.length - 1].name}`,
+        line: lineIdFor(p.pattern.feed, p.pattern.routeId),
         route: label,
         stations,
-        headsign: p.headsign ?? undefined,
+        headsign: p.pattern.headsign ?? undefined,
         tripId: p.tripId,
-        from: p.path[0].stop.name,
-        to: slice[slice.length - 1].stop.name,
+        from: stations[0].name,
+        to: stations[stations.length - 1].name,
       });
     }
   }
@@ -441,6 +439,7 @@ function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, day
     title: `Sampai di ${to.name ?? "destinasi"}`,
     subtitle: "Arrive",
   });
+
   return {
     origin: from.name ?? `${from.lat.toFixed(4)},${from.lon.toFixed(4)}`,
     destination: to.name ?? `${to.lat.toFixed(4)},${to.lon.toFixed(4)}`,
@@ -449,14 +448,19 @@ function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, day
     total_minutes: Math.round((target.arrive - startSec) / 60),
     source: { feed: "router", ingested_at: metaMap(db)["rail:ingested_at"] ?? null },
     legs,
+    _arrive: target.arrive,
     _debug: {
       rounds: chain.filter((n) => n.parent?.type === "ride").length,
       destinationWalkMeters: Math.round(target.meters),
       stats: ctx.stats,
       rides: chain.filter((n) => n.parent?.type === "ride").map((n) => ({
-        round: n.round, tripId: n.parent.tripId, routeId: n.parent.routeId,
-        dep: hhmm(n.parent.dep - dayOffset), arr: hhmm(n.parent.arr - dayOffset),
-        from: n.parent.path[0].stop.name, to: n.stop.name,
+        round: n.round,
+        tripId: n.parent.tripId,
+        routeId: n.parent.pattern.routeId,
+        dep: hhmm(n.parent.dep - dayOffset),
+        arr: hhmm(n.parent.arr - dayOffset),
+        from: index.byKey.get(n.parent.pattern.stopKeys[n.parent.fromIdx])?.name,
+        to: n.stop.name,
       })),
     },
   };
