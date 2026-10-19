@@ -123,6 +123,24 @@ button {
   margin-bottom: var(--space-4);
 }
 
+.step__live {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  color: var(--color-ink-muted);
+  font-size: var(--type-size-xs);
+  letter-spacing: var(--type-tracking-label);
+  text-transform: uppercase;
+}
+
+.step__live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-ink);
+}
+
 .when {
   position: relative;
   margin-bottom: var(--space-6);

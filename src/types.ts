@@ -12,9 +12,11 @@ export type PlanLeg = {
   stations?: Station[];
   headsign?: string;
   route?: string;
+  routeId?: string;
   tripId?: string;
   from?: string;
   to?: string;
+  live?: { vehicles: number; delay_min: number; updated_at: string; feed?: string };
 };
 
 export type Plan = {

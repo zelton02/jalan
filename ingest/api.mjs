@@ -17,6 +17,7 @@ import { resolve } from "node:path";
 import { openDb, metaMap, klNow, ymdInfo, hhmm } from "./lib.mjs";
 import { buildIndex, planJourney, planAlternatives } from "./router.mjs";
 import { geocode } from "./geocode.mjs";
+import { liveStatus } from "./live.mjs";
 
 const argv = process.argv.slice(2);
 const atIdx = argv.indexOf("--at");
@@ -133,6 +134,37 @@ function coverageWarning(ymd) {
 const DEFAULT_FROM = { lat: 3.041707, lon: 101.80142, name: "Sungai Long" };
 const DEFAULT_TO = { lat: 3.13442, lon: 101.68625, name: "KL Sentral" };
 
+/**
+ * Attach live route status to ride legs at response time, never inside the plan cache: the
+ * cached itinerary is a schedule fact, the live number is only true for ~a minute.
+ */
+function withLive(payload) {
+  const live = liveStatus();
+  if (!live.updated_at) return payload;
+
+  const decorate = (plan) => {
+    const legs = plan.legs.map((leg) => {
+      if (leg.kind !== "ride" || !leg.routeId) return leg;
+      const status = live.routes[leg.routeId];
+      if (!status) return leg;
+      return {
+        ...leg,
+        live: {
+          vehicles: status.vehicles,
+          delay_min: status.median_delay_min,
+          updated_at: live.updated_at,
+          feed: status.feed,
+        },
+      };
+    });
+    return { ...plan, legs };
+  };
+
+  return payload.plans
+    ? { ...payload, plans: payload.plans.map(decorate) }
+    : decorate(payload);
+}
+
 /** "3.04,101.80" is used as-is; anything else goes through the cached geocoder. */
 async function resolvePlace(value, fallback, nameOverride) {
   if (!value) return fallback;
@@ -171,7 +203,7 @@ async function handlePlan(url, res, mode = "plan") {
   const cached = planCache.get(key);
   // A live plan goes stale within minutes; only a pinned clock is safe to keep.
   const fresh = cached && (atSec != null || Date.now() - cached.at < 30_000);
-  if (fresh) return json(res, 200, cached.payload);
+  if (fresh) return json(res, 200, withLive(cached.payload));
 
   let plans;
   if (mode === "plans") {
@@ -200,7 +232,7 @@ async function handlePlan(url, res, mode = "plan") {
     : { ...clean[0], clock, ...(warning ? { warning } : {}) };
   planCache.set(key, { payload, at: Date.now() });
   if (planCache.size > 200) planCache.delete(planCache.keys().next().value);
-  json(res, 200, payload);
+  json(res, 200, withLive(payload));
 }
 
 // Warm the JIT and the per-day caches so the first real request is not ~1s slower.
@@ -221,6 +253,24 @@ createServer(async (req, res) => {
         feeds: metaMap(freshen())["rail:ingested_at"] ? "loaded" : "missing",
         stops: index.stops.length,
       });
+    }
+    if (url.pathname === "/api/live") {
+      const live = liveStatus();
+      if (!live.updated_at) {
+        return json(res, 503, { error: "Tiada data langsung. / No live data.", ...live });
+      }
+      const route = url.searchParams.get("route");
+      if (route) {
+        const hit = live.routes[route];
+        if (!hit) {
+          return json(res, 404, {
+            error: `Tiada kenderaan langsung untuk ${route}. / No live vehicle on ${route}.`,
+            updated_at: live.updated_at,
+          });
+        }
+        return json(res, 200, { updated_at: live.updated_at, ...hit });
+      }
+      return json(res, 200, live);
     }
     if (url.pathname === "/api/plan") return await handlePlan(url, res, "plan");
     if (url.pathname === "/api/plans") return await handlePlan(url, res, "plans");

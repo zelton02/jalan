@@ -464,7 +464,7 @@ function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, day
       // this constantly). If the rider stays on the same line at the same stop, show
       // one leg with the wait, not two "board" steps.
       const gap = lastRide ? p.dep - lastRide.arr : Infinity;
-      if (lastRide && lastRide.route === routeLabel && lastRide.to === stations[0].name && gap >= 0 && gap <= 15 * 60) {
+      if (lastRide && lastRide.routeId === p.pattern.routeId && lastRide.to === stations[0].name && gap >= 0 && gap <= 15 * 60) {
         const leg = lastRide.leg;
         leg.stations.push(...stations.slice(1));
         leg.duration = `${Math.max(1, Math.round((p.arr - lastRide.dep) / 60))} min`;
@@ -483,6 +483,7 @@ function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, day
         title: `${routeLabel} ke ${stations[stations.length - 1].name}`,
         line: lineIdFor(p.pattern.feed, p.pattern.routeId),
         route: routeLabel,
+        routeId: p.pattern.routeId,
         stations,
         headsign: p.pattern.headsign ?? undefined,
         tripId: p.tripId,
@@ -490,7 +491,7 @@ function runRaptor(db, index, { from, to, startSec, maxRounds, ymd, weekday, day
         to: stations[stations.length - 1].name,
       };
       legs.push(leg);
-      lastRide = { leg, route: routeLabel, to: leg.to, arr: p.arr, dep: p.dep };
+      lastRide = { leg, route: routeLabel, routeId: p.pattern.routeId, to: leg.to, arr: p.arr, dep: p.dep };
     }
   }
 

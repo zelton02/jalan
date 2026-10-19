@@ -108,6 +108,25 @@ possible on feeds that exist (KTMB, buses).
 
 Runs as the systemd unit `jalan-realtime` (`Restart=always`), started 2026-10-19.
 
+### Delay inference — what “live” means here
+
+The feed publishes positions only; every trip-update URL returns 404. Delay is therefore inferred:
+
+- Bus trips are frequency templates: one `trip_id` repeats every N minutes inside a window, and the
+  vehicle often keeps broadcasting a stale template (a bus at 14:15 can still report its 09:25
+  trip). Runs are matched against **every frequency window of the pattern**, filtered to the
+  weekday/weekend service of the sample timestamp.
+- inferred start = now − time already spent along the pattern. The closest run start is accepted
+  only when it is within 40% of that run's headway; otherwise the vehicle is dropped, not guessed.
+- delay = (now + time to the nearest stop) − (run start + scheduled offset). Anything beyond
+  45 minutes is treated as a bad match.
+
+Limits: with a 10-minute headway the number is only reliable to ±4 minutes, with 30 minutes to
+±12; GPS jitter and the nearest-stop projection add ~1 minute. It is a **route estimate, not a
+promise for the specific trip**, and the UI says so. Rail has no realtime at all.
+
+`npm run live -- --route U5900` prints the vehicles behind the number.
+
 Why collect before there is a feature: the official feeds only expose *now*. Headways, bunching and
 travel times can only be measured from history, and history cannot be backfilled. Feeds sampled:
 `rapid-bus-kl`, `rapid-bus-mrtfeeder`, `ktmb`. Rail is absent upstream (see above), so nothing is

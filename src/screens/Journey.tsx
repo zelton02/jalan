@@ -20,6 +20,13 @@ const klHM = () =>
     hour12: false,
   }).format(new Date());
 
+type Live = NonNullable<PlanLeg["live"]>;
+const liveLabel = (live: Live) => {
+  const delay =
+    live.delay_min === 0 ? "tepat masa" : `${live.delay_min > 0 ? "lewat" : "awal"} ${Math.abs(live.delay_min)} min`;
+  return `${delay} · ${live.vehicles} ${live.feed === "ktmb" ? "tren" : "bas"}`;
+};
+
 export default function Journey({ plan, onBack }: { plan: Plan; onBack: () => void }) {
   const [open, setOpen] = useState<number | null>(null);
   const [now, setNow] = useState(klHM);
@@ -64,6 +71,15 @@ export default function Journey({ plan, onBack }: { plan: Plan; onBack: () => vo
                 <div className="eyebrow">{kindLabel[leg.kind]}</div>
                 <div className="step__title">{leg.title}</div>
                 {leg.subtitle ? <div className="step__sub">{leg.subtitle}</div> : null}
+                {leg.live ? (
+                  <div
+                    className="step__live"
+                    title="Anggaran dari kenderaan di laluan ini sekarang, bukan trip ini. / Estimate from vehicles on this route now, not this trip."
+                  >
+                    <span className="step__live-dot" aria-hidden="true" />
+                    LIVE {liveLabel(leg.live)}
+                  </div>
+                ) : null}
                 <div className="step__meta">
                   {leg.line ? <LineBadge line={leg.line} short={lineShort[leg.line]} /> : null}
                   {leg.duration ? <span>{leg.duration}</span> : null}
@@ -101,6 +117,13 @@ export default function Journey({ plan, onBack }: { plan: Plan; onBack: () => vo
           );
         })}
       </ol>
+
+      {plan.legs.some((leg) => leg.live) ? (
+        <p className="footnote">
+          LIVE: anggaran dari kenderaan di laluan ini sekarang, bukan trip ini. / Estimated from
+          vehicles on the route now, not this trip.
+        </p>
+      ) : null}
 
       <div className="bottom">
         <div className="bottom__label">SETERUSNYA / NEXT</div>

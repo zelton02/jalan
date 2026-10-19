@@ -25,6 +25,11 @@ changes, not when plans are made (plans belong in `BACKLOG.md`).
   “Berlepas Sel, 20 Okt · 07:00”. A date outside a core feed's calendar shows a warning instead of
   silently planning a degraded route.
 - `npm run route -- --from ... --to ... --date 2026-10-21 --at 07:00`
+- Live bus status: `ingest/live.mjs` infers each vehicle's run from the pattern's frequency
+  windows (RT `trip_id` is often a stale template), and `/api/live?route=U5900` returns the
+  vehicles + median delay. Ride legs in `/api/plan(s)` carry `live: {vehicles, delay_min, feed}`.
+  The Journey screen shows “LIVE LEWAT 3 MIN · 2 BAS”; the footnote says it is a route estimate,
+  not this trip. Ambiguous matches are dropped, not guessed.
 - The UI searches any Malaysian address; the corridor gate is gone.
 - `/api/plans` returns up to 3 itineraries, each forced to start on a different first vehicle;
   the results screen lists them with Tercepat / Alternatif tags.
