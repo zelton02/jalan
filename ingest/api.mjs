@@ -21,6 +21,7 @@ import { resolve } from "node:path";
 import { openDb, metaMap, klNow, ymdInfo, hhmm } from "./lib.mjs";
 import { buildIndex, planJourney, planAlternatives, ACCESS_RADIUS_M, haversineM } from "./router.mjs";
 import { geocode, suggestPlaces } from "./geocode.mjs";
+import { googleEnabled, autocompletePlaces, placeById, geocodeWithGoogle } from "./google.mjs";
 import { walkMatrix } from "./walk.mjs";
 import { liveStatus } from "./live.mjs";
 import { searchStops, nextDepartures } from "./board.mjs";
@@ -184,7 +185,7 @@ async function resolvePlace(value, fallback, nameOverride) {
     const hit = placeCache.get(key);
     return nameOverride ? { ...hit, name: nameOverride } : hit;
   }
-  const hit = await geocode(text);
+  const hit = (googleEnabled() ? await geocodeWithGoogle(text) : null) ?? (await geocode(text));
   if (!hit) return null;
   const place = { lat: hit.lat, lon: hit.lon, name: hit.name };
   placeCache.set(key, place);
@@ -308,13 +309,33 @@ createServer(async (req, res) => {
       // in a second call and shows the stops immediately.
       let places = [];
       if (url.searchParams.get("places") === "1") {
-        places = (await suggestPlaces(q, 8))
-          .map((place) => ({ ...place, distance_m: dist(place) }))
-          .sort((a, b) => (a.distance_m ?? Infinity) - (b.distance_m ?? Infinity));
-        const near = places.filter((place) => place.distance_m != null && place.distance_m <= 150_000);
-        places = (near.length >= 2 ? near : places).slice(0, 4);
+        if (googleEnabled()) {
+          const session = url.searchParams.get("session") ?? null;
+          places = (await autocompletePlaces(q, { at: here, limit: 5, session })).map((place) => ({
+            place_id: place.placeId,
+            name: place.name,
+            display: place.address,
+            lat: null,
+            lon: null,
+            distance_m: null,
+          }));
+        } else {
+          places = (await suggestPlaces(q, 8))
+            .map((place) => ({ ...place, distance_m: dist(place) }))
+            .sort((a, b) => (a.distance_m ?? Infinity) - (b.distance_m ?? Infinity));
+          const near = places.filter((place) => place.distance_m != null && place.distance_m <= 150_000);
+          places = (near.length >= 2 ? near : places).slice(0, 4);
+        }
       }
       return json(res, 200, { q, stops, places });
+    }
+    if (url.pathname === "/api/place") {
+      const id = url.searchParams.get("id");
+      if (!id) return json(res, 400, { error: "id diperlukan. / id is required." });
+      const place = await placeById(id);
+      return place
+        ? json(res, 200, place)
+        : json(res, 404, { error: "Tempat tidak dijumpai. / Place not found." });
     }
     if (url.pathname === "/api/stops") {
       const q = url.searchParams.get("q") ?? "";

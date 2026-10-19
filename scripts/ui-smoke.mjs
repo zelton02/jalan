@@ -67,9 +67,13 @@ await fromInput.click();
 await fromInput.fill("mid valley");
 await page.waitForSelector(".suggest__item", { timeout: 8000 });
 const suggestCount = await page.locator(".suggest__item").count();
+const placeRows = await page
+  .locator(".suggest__item", { hasText: "TEMPAT" })
+  .count()
+  .catch(() => 0);
 await page.locator(".suggest__item").first().click();
 await page.waitForTimeout(200);
-console.log("SUGGEST:", suggestCount, "items |", await fromInput.inputValue());
+console.log("SUGGEST:", suggestCount, "items |", placeRows, "places |", await fromInput.inputValue());
 
 // 5. stop board: search a stop, then read its departures
 await page.goto(BASE, { waitUntil: "networkidle" });

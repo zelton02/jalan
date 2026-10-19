@@ -3,7 +3,7 @@ import Field from "../components/Field";
 import Button from "../components/Button";
 import Alert from "../components/Alert";
 import { useSuggest, type Suggestion } from "../useSuggest";
-import type { LatLon } from "../api";
+import { fetchPlaceById, type LatLon } from "../api";
 import { getPlaces, getRecent, setPlace, type RecentTrip, type SavedPlace } from "../saved";
 
 type Props = {
@@ -139,15 +139,29 @@ export default function Search({ onSearch, onBoard, loading, error }: Props) {
     setActive(field);
   };
 
-  const pick = (field: FieldKey, item: Suggestion) => {
+  const pick = async (field: FieldKey, item: Suggestion) => {
+    let value = item.value;
+    let name = item.name;
+    // Google autocomplete returns an id, not coordinates; resolve it on selection.
+    if (!value && item.placeId) {
+      try {
+        const place = await fetchPlaceById(item.placeId);
+        if (place) {
+          value = `${place.lat.toFixed(5)},${place.lon.toFixed(5)}`;
+          name = item.name || place.name;
+        }
+      } catch {
+        // fall through: the text will be geocoded server-side
+      }
+    }
     if (field === "from") {
-      setFromText(item.name);
-      setFromCoord(item.value);
-      setFromName(item.name);
+      setFromText(name);
+      setFromCoord(value || undefined);
+      setFromName(name);
     } else {
-      setToText(item.name);
-      setToCoord(item.value);
-      setToName(item.name);
+      setToText(name);
+      setToCoord(value || undefined);
+      setToName(name);
     }
     setActive(null);
   };
@@ -267,7 +281,7 @@ export default function Search({ onSearch, onBoard, loading, error }: Props) {
           }
         >
           {active === "from" && fromSug.open && fromSug.items.length ? (
-            <SuggestList items={fromSug.items} hi={hi} onPick={(item) => pick("from", item)} onHover={setHi} />
+            <SuggestList items={fromSug.items} hi={hi} onPick={(item) => void pick("from", item)} onHover={setHi} />
           ) : null}
         </Field>
 
@@ -297,7 +311,7 @@ export default function Search({ onSearch, onBoard, loading, error }: Props) {
           }
         >
           {active === "to" && toSug.open && toSug.items.length ? (
-            <SuggestList items={toSug.items} hi={hi} onPick={(item) => pick("to", item)} onHover={setHi} />
+            <SuggestList items={toSug.items} hi={hi} onPick={(item) => void pick("to", item)} onHover={setHi} />
           ) : null}
         </Field>
       </div>

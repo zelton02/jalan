@@ -31,22 +31,24 @@ export type StopSuggestion = {
 export type PlaceSuggestion = {
   name: string;
   display: string;
-  lat: number;
-  lon: number;
+  lat: number | null;
+  lon: number | null;
+  place_id?: string | null;
   type?: string;
   category?: string;
   distance_m: number | null;
 };
 
-type SuggestOptions = { at?: LatLon | null; places?: boolean; signal?: AbortSignal };
+type SuggestOptions = { at?: LatLon | null; places?: boolean; signal?: AbortSignal; session?: string };
 
-async function suggest(q: string, { at, places, signal }: SuggestOptions = {}) {
+async function suggest(q: string, { at, places, signal, session }: SuggestOptions = {}) {
   const params = new URLSearchParams({ q });
   if (at) {
     params.set("lat", String(at.lat));
     params.set("lon", String(at.lon));
   }
   if (places) params.set("places", "1");
+  if (session) params.set("session", session);
   const res = await fetch(`/api/suggest?${params}`, { signal, headers: { accept: "application/json" } });
   if (!res.ok) return { stops: [] as StopSuggestion[], places: [] as PlaceSuggestion[] };
   const body = await res.json();
@@ -64,4 +66,14 @@ export async function fetchStopSuggestions(q: string, options: SuggestOptions = 
 export async function fetchPlaceSuggestions(q: string, options: SuggestOptions = {}) {
   const body = await suggest(q, { ...options, places: true });
   return body.places;
+}
+
+export type ResolvedPlace = { name: string; address: string; lat: number; lon: number; placeId?: string };
+
+export async function fetchPlaceById(id: string, signal?: AbortSignal): Promise<ResolvedPlace | null> {
+  const res = await fetch(`/api/place?id=${encodeURIComponent(id)}`, { signal, headers: { accept: "application/json" } });
+  if (!res.ok) return null;
+  const body = await res.json();
+  if (!Number.isFinite(body.lat) || !Number.isFinite(body.lon)) return null;
+  return body as ResolvedPlace;
 }

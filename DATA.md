@@ -134,6 +134,14 @@ the result in `data/geocode.json` permanently. Suggestions use the same budget: 
 keeps 14 days of prefix results capped at 400 queries, and queued keystrokes are dropped when a
 newer one arrives, so typing a name costs at most one request per second.
 
+With `GOOGLE_MAPS_API_KEY` present (`~/.config/jalan/google.env`, mode 600), `ingest/google.mjs`
+takes over: Places API (New) autocomplete for suggestions, Text Search for free-text addresses,
+Place Details for a picked `place_id`. Google's terms allow caching place content for at most 30
+days, so `data/google-cache.json` expires autocomplete in 1 day and places/searches in 30; the
+`place_id` itself is kept. A daily call cap (default 800) falls back to Nominatim instead of
+silently spending. The legacy `maps.googleapis.com` endpoints are not enabled on this key, so
+every call goes to `places.googleapis.com`.
+
 ### Walking times
 
 `ingest/walk.mjs` uses a self-hosted OSRM foot graph (OpenStreetMap Klang Valley, built by

@@ -24,11 +24,12 @@ That stance produces the rules in [`AESTHETIC.md`](./AESTHETIC.md). Read it befo
 
 ## Search
 
-Both fields are search-as-you-type. Stops come from the local GTFS index and appear instantly;
-places come from Nominatim, rate-limited and fetched in a second request, so they slide in under
-the stops a moment later. Picking a stop sends its coordinates, not its name, so "Bandar Utama"
-routes from the station instead of the suburb centroid. Distances use the last "use my location"
-or the other field as the reference point; without one, the list is name-ranked only.
+Both fields are search-as-you-type. Stops come from the local GTFS index and appear instantly.
+Place suggestions come from Google Places API (New) when `GOOGLE_MAPS_API_KEY` is set — the
+legacy Maps APIs are not enabled on the key — and fall back to Nominatim otherwise. Picking a stop
+sends its coordinates; picking a place resolves its `place_id` to coordinates through
+`/api/place`. Either way "Bandar Utama" routes from the station or the mall, not from the suburb
+centroid. Distances use the last "use my location" or the other field as the reference point.
 
 ## Data pipeline
 
