@@ -5,6 +5,7 @@ import LineBadge from "../components/LineBadge";
 import RouteMap from "../components/RouteMap";
 import { fetchVehicles } from "../api";
 import { lineShort, planRouteColors } from "../data/lines";
+import { useGeolocation } from "../useGeolocation";
 import type { Plan, PlanLeg, Vehicle } from "../types";
 
 const kindLabel: Record<PlanLeg["kind"], string> = {
@@ -56,6 +57,8 @@ export default function Journey({ plan, onBack }: { plan: Plan; onBack: () => vo
   const [open, setOpen] = useState<number | null>(null);
   const [focus, setFocus] = useState<number | null>(null);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [started, setStarted] = useState(false);
+  const geo = useGeolocation();
   const [now, setNow] = useState(klHM);
   const [punct, setPunct] = useState<Record<string, HourStat[]>>({});
   const [punctDays, setPunctDays] = useState(0);
@@ -122,6 +125,20 @@ export default function Journey({ plan, onBack }: { plan: Plan; onBack: () => vo
   const next = plan.legs[0];
   const offline = typeof navigator !== "undefined" && !navigator.onLine;
 
+  // Start following the rider: watch the GPS, then bring the map to them.
+  const toggleFollow = () => {
+    if (started) {
+      geo.stop();
+      setStarted(false);
+      return;
+    }
+    geo.start();
+    setStarted(true);
+    window.requestAnimationFrame(() => {
+      document.querySelector(".map")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  };
+
   return (
     <div className="screen screen--journey">
       <header className="topbar">
@@ -136,7 +153,7 @@ export default function Journey({ plan, onBack }: { plan: Plan; onBack: () => vo
 
       {offline ? <Alert>Luar talian. Waktu dianggarkan. / Offline — times are estimates.</Alert> : null}
 
-      <RouteMap plan={plan} focus={focus} vehicles={vehicles} />
+      <RouteMap plan={plan} focus={focus} vehicles={vehicles} me={geo.fix} follow={started} />
       <RouteLegend plan={plan} />
 
       <ol className="steps">
@@ -226,11 +243,19 @@ export default function Journey({ plan, onBack }: { plan: Plan; onBack: () => vo
         </p>
       ) : null}
 
+      {geo.error ? <Alert>{geo.error}</Alert> : null}
+
       <div className="bottom">
-        <div className="bottom__label">SETERUSNYA / NEXT</div>
-        <div className="bottom__next">{next.title} · {next.start}</div>
-        <Button variant="primary" block>
-          Mula / Start
+        <div className="bottom__label">{started ? "SEDANG BERJALAN / RUNNING" : "SETERUSNYA / NEXT"}</div>
+        <div className="bottom__next">
+          {started
+            ? geo.fix
+              ? `Lokasi anda · ±${Math.round(geo.fix.accuracy)} m`
+              : "Mencari lokasi… / Finding your location…"
+            : `${next.title} · ${next.start}`}
+        </div>
+        <Button variant="primary" block onClick={toggleFollow}>
+          {started ? "Henti / Stop" : "Mula / Start"}
         </Button>
       </div>
     </div>

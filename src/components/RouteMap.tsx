@@ -34,16 +34,21 @@ type Props = {
   /** Index of the leg to frame; null fits the whole journey. */
   focus?: number | null;
   vehicles?: Vehicle[];
+  /** Live rider position while a journey is running. */
+  me?: { lat: number; lon: number; accuracy?: number } | null;
+  /** Keep the map centred on `me` as it moves. */
+  follow?: boolean;
   /** Small, non-interactive preview (results cards). */
   compact?: boolean;
 };
 
 /** Route map: GTFS shapes for rides, OSRM paths for walks, live vehicles on top. */
-export default function RouteMap({ plan, focus = null, vehicles = [], compact = false }: Props) {
+export default function RouteMap({ plan, focus = null, vehicles = [], me = null, follow = false, compact = false }: Props) {
   const node = useRef<HTMLDivElement | null>(null);
   const map = useRef<L.Map | null>(null);
   const base = useRef<L.LayerGroup | null>(null);
   const moving = useRef<L.LayerGroup | null>(null);
+  const rider = useRef<L.LayerGroup | null>(null);
   const journeyBounds = useRef<L.LatLngBounds | null>(null);
 
   useEffect(() => {
@@ -64,13 +69,27 @@ export default function RouteMap({ plan, focus = null, vehicles = [], compact = 
     }).addTo(instance);
     base.current = L.layerGroup().addTo(instance);
     moving.current = L.layerGroup().addTo(instance);
+    rider.current = L.layerGroup().addTo(instance);
     map.current = instance;
+
+    // Exposed for smoke tests and debugging.
+    const stamp = () => {
+      try {
+        instance.getContainer().dataset.zoom = String(instance.getZoom());
+        instance.getContainer().dataset.center = `${instance.getCenter().lat.toFixed(5)},${instance.getCenter().lng.toFixed(5)}`;
+      } catch {
+        // The map has no view yet (still booting); the next zoomend/moveend will stamp it.
+      }
+    };
+    instance.on("zoomend moveend", stamp);
+    stamp();
 
     return () => {
       instance.remove();
       map.current = null;
       base.current = null;
       moving.current = null;
+      rider.current = null;
     };
   }, [compact]);
 
@@ -186,6 +205,38 @@ export default function RouteMap({ plan, focus = null, vehicles = [], compact = 
     if (pts && pts.length > 1) instance.fitBounds(L.latLngBounds(pts), { padding: [30, 30], maxZoom: 16 });
     else if (journeyBounds.current) instance.fitBounds(journeyBounds.current, { padding: [22, 22], maxZoom: 15 });
   }, [focus, plan]);
+
+  // Rider position: pulsing dot, accuracy halo, and follow mode while the journey runs.
+  useEffect(() => {
+    const instance = map.current;
+    const group = rider.current;
+    if (!instance || !group) return;
+    group.clearLayers();
+    if (!me) return;
+
+    const point: [number, number] = [me.lat, me.lon];
+    if (me.accuracy && me.accuracy > 15) {
+      L.circle(point, {
+        radius: me.accuracy,
+        color: "#1d4ed8",
+        weight: 1,
+        opacity: 0.35,
+        fillColor: "#1d4ed8",
+        fillOpacity: 0.08,
+      }).addTo(group);
+    }
+    L.marker(point, {
+      keyboard: false,
+      icon: L.divIcon({
+        className: "me-dot",
+        html: "<span></span>",
+        iconSize: [16, 16],
+        iconAnchor: [8, 8],
+      }),
+    }).addTo(group);
+
+    if (follow) instance.setView(point, Math.max(instance.getZoom(), 16), { animate: true });
+  }, [me, follow]);
 
   return <div className={compact ? "map map--compact" : "map"} ref={node} role="img" aria-label="Peta laluan / Route map" />;
 }

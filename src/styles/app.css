@@ -160,6 +160,40 @@ button {
   box-shadow: 0 0 0 2px rgba(20, 22, 26, 0.55);
 }
 
+/* Live rider position. */
+.me-dot span {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #1d4ed8;
+  border: 3px solid #ffffff;
+  box-shadow: 0 0 0 2px rgba(29, 78, 216, 0.45);
+}
+
+.me-dot::after {
+  content: "";
+  position: absolute;
+  inset: -7px;
+  border-radius: 50%;
+  border: 2px solid rgba(29, 78, 216, 0.5);
+  animation: me-pulse 2s ease-out infinite;
+}
+
+@keyframes me-pulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  70% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
 /* Results preview: decorative only, so taps fall through to the card. */
 .map--compact {
   height: 128px;

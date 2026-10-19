@@ -9,6 +9,11 @@
  */
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
+import dns from "node:dns";
+
+// The key is restricted to this server's IPv4 address. Node prefers AAAA records, and Google
+// rejects the request as coming from an unlisted IPv6 address, so resolve IPv4 first.
+dns.setDefaultResultOrder("ipv4first");
 
 const KEY_FILE = `${homedir()}/.config/jalan/google.env`;
 const CACHE_PATH = new URL("../data/google-cache.json", import.meta.url).pathname;

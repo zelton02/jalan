@@ -137,6 +137,10 @@ no `shapes.txt`, so its legs carry no polyline and the map draws only the endpoi
 
 ### Geocoding
 
+Google Places requests resolve IPv4 first (`dns.setDefaultResultOrder("ipv4first")`): the API key
+is restricted to this server's IPv4 address, and Node otherwise leaves over IPv6, which Google
+rejects with `PERMISSION_DENIED`.
+
 `ingest/geocode.mjs` resolves addresses through Nominatim (1 req/s, a real User-Agent) and caches
 the result in `data/geocode.json` permanently. Suggestions use the same budget: `data/suggest.json`
 keeps 14 days of prefix results capped at 400 queries, and queued keystrokes are dropped when a

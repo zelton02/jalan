@@ -53,6 +53,9 @@ required, light personal use).
 - Tapping a step in the itinerary zooms the map to that leg; tapping it again returns to the
   whole journey.
 - The results screen shows a compact, non-interactive preview map per route.
+- **Mula / Start** on the journey screen asks for the browser's location (HTTPS only), draws a
+  pulsing blue dot with an accuracy halo, and centres the map on the rider at zoom 16. It keeps
+  following while the journey runs; the button becomes **Henti / Stop**.
 
 ## Data pipeline
 
