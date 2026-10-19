@@ -59,6 +59,9 @@ function staticDb() {
   const mtime = statSync(ST_PATH).mtimeMs;
   if (staticCache.db && staticCache.mtime === mtime) return staticCache;
   try { staticCache.db?.close(); } catch {}
+  // Trip/pattern ids may be reused by a new feed version; never mix old offsets with new data.
+  patternCache.clear();
+  windowCache.clear();
   const db = new DatabaseSync(ST_PATH, { readOnly: true });
   const stops = new Map();
   for (const r of db.prepare("SELECT stop_id, stop_name, lat, lon FROM stops").all()) {
