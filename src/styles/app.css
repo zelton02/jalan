@@ -85,6 +85,7 @@ button {
 }
 
 .field {
+  position: relative;
   display: block;
   border-bottom: 1px solid var(--color-hairline);
   padding: var(--space-3) 0;
@@ -128,6 +129,67 @@ button {
 
 .field__star--on {
   color: var(--color-ink);
+}
+
+/* Search-as-you-type list, anchored under the input. Stops come first, places after. */
+.suggest {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 2px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: var(--space-1);
+  list-style: none;
+  background: var(--color-surface);
+  border: 1px solid var(--color-hairline);
+  border-radius: 8px;
+  box-shadow: 0 12px 32px rgba(20, 22, 26, 0.18);
+  max-height: 280px;
+  overflow: auto;
+}
+
+.suggest__item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: var(--space-2);
+  row-gap: 1px;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.suggest__item.is-active {
+  background: var(--color-hairline);
+}
+
+.suggest__kind {
+  align-self: center;
+  font-size: var(--type-size-xs);
+  letter-spacing: 0.08em;
+  color: var(--color-ink-muted);
+  white-space: nowrap;
+}
+
+.suggest__name {
+  font-size: var(--type-size-md);
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggest__sub {
+  grid-column: 2;
+  font-size: var(--type-size-xs);
+  color: var(--color-ink-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .chips {

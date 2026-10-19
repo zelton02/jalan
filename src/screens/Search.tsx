@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type KeyboardEvent } from "react";
 import Field from "../components/Field";
 import Button from "../components/Button";
 import Alert from "../components/Alert";
+import { useSuggest, type Suggestion } from "../useSuggest";
+import type { LatLon } from "../api";
 import { getPlaces, getRecent, setPlace, type RecentTrip, type SavedPlace } from "../saved";
 
 type Props = {
@@ -11,11 +13,60 @@ type Props = {
   error: string | null;
 };
 
+type FieldKey = "from" | "to";
+
+const isCoord = (s: string) => /^-?\d+(?:\.\d+)?,-?\d+(?:\.\d+)?$/.test(s.trim());
+
+const parsePoint = (s?: string): LatLon | null => {
+  if (!s || !isCoord(s)) return null;
+  const [lat, lon] = s.split(",").map(Number);
+  return Number.isFinite(lat) && Number.isFinite(lon) ? { lat, lon } : null;
+};
+
+function SuggestList({
+  items,
+  hi,
+  onPick,
+  onHover,
+}: {
+  items: Suggestion[];
+  hi: number;
+  onPick: (item: Suggestion) => void;
+  onHover: (index: number) => void;
+}) {
+  return (
+    <ul className="suggest" role="listbox">
+      {items.map((item, index) => (
+        <li key={item.id} role="option" aria-selected={index === hi}>
+          <button
+            type="button"
+            className={index === hi ? "suggest__item is-active" : "suggest__item"}
+            onMouseDown={(event) => {
+              event.preventDefault();
+              onPick(item);
+            }}
+            onMouseEnter={() => onHover(index)}
+          >
+            <span className="suggest__kind">{item.kind === "stop" ? "HENTIAN" : "TEMPAT"}</span>
+            <span className="suggest__name">{item.name}</span>
+            {item.sub ? <span className="suggest__sub">{item.sub}</span> : null}
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default function Search({ onSearch, onBoard, loading, error }: Props) {
-  const [from, setFrom] = useState("Sungai Long");
-  const [to, setTo] = useState("KL Sentral");
-  const [fromName, setFromName] = useState<string | undefined>();
-  const [toName, setToName] = useState<string | undefined>();
+  const [fromText, setFromText] = useState("Sungai Long");
+  const [toText, setToText] = useState("KL Sentral");
+  const [fromCoord, setFromCoord] = useState<string>();
+  const [toCoord, setToCoord] = useState<string>();
+  const [fromName, setFromName] = useState<string>();
+  const [toName, setToName] = useState<string>();
+  const [active, setActive] = useState<FieldKey | null>(null);
+  const [hi, setHi] = useState(0);
+  const [geo, setGeo] = useState<LatLon | null>(null);
   const [when, setWhen] = useState("");
   const [locating, setLocating] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
@@ -24,12 +75,20 @@ export default function Search({ onSearch, onBoard, loading, error }: Props) {
   const [recent, setRecent] = useState<RecentTrip[]>([]);
   const minWhen = new Date().toLocaleString("sv-SE").slice(0, 16).replace(" ", "T");
 
+  const fromSug = useSuggest(fromText, geo ?? parsePoint(toCoord), active === "from");
+  const toSug = useSuggest(toText, geo ?? parsePoint(fromCoord), active === "to");
+  const shown = active === "from" ? fromSug : active === "to" ? toSug : null;
+
   useEffect(() => {
     const places = getPlaces();
     setHome(places.home);
     setWork(places.work);
     setRecent(getRecent());
   }, []);
+
+  useEffect(() => {
+    setHi(0);
+  }, [active, shown?.items.length]);
 
   const locate = () => {
     setGeoError(null);
@@ -40,9 +99,14 @@ export default function Search({ onSearch, onBoard, loading, error }: Props) {
     setLocating(true);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setFrom(`${pos.coords.latitude.toFixed(5)},${pos.coords.longitude.toFixed(5)}`);
-        setFromName("Lokasi saya");
+        const label = "Lokasi saya";
+        const coord = `${pos.coords.latitude.toFixed(5)},${pos.coords.longitude.toFixed(5)}`;
+        setGeo({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+        setFromText(label);
+        setFromCoord(coord);
+        setFromName(label);
         setLocating(false);
+        setActive(null);
       },
       () => {
         setLocating(false);
@@ -53,10 +117,54 @@ export default function Search({ onSearch, onBoard, loading, error }: Props) {
   };
 
   const swap = () => {
-    setFrom(to);
-    setTo(from);
+    setFromText(toText);
+    setToText(fromText);
+    setFromCoord(toCoord);
+    setToCoord(fromCoord);
     setFromName(toName);
     setToName(fromName);
+    setActive(null);
+  };
+
+  const change = (field: FieldKey, value: string) => {
+    if (field === "from") {
+      setFromText(value);
+      setFromCoord(undefined);
+      setFromName(undefined);
+    } else {
+      setToText(value);
+      setToCoord(undefined);
+      setToName(undefined);
+    }
+    setActive(field);
+  };
+
+  const pick = (field: FieldKey, item: Suggestion) => {
+    if (field === "from") {
+      setFromText(item.name);
+      setFromCoord(item.value);
+      setFromName(item.name);
+    } else {
+      setToText(item.name);
+      setToCoord(item.value);
+      setToName(item.name);
+    }
+    setActive(null);
+  };
+
+  const useSaved = (field: FieldKey, place: SavedPlace) => {
+    const coord = isCoord(place.value) ? place.value : undefined;
+    const text = place.name ?? place.value;
+    if (field === "from") {
+      setFromText(text);
+      setFromCoord(coord);
+      setFromName(place.name ?? text);
+    } else {
+      setToText(text);
+      setToCoord(coord);
+      setToName(place.name ?? text);
+    }
+    setActive(null);
   };
 
   const toggleHome = () => {
@@ -65,8 +173,8 @@ export default function Search({ onSearch, onBoard, loading, error }: Props) {
       setHome(undefined);
       return;
     }
-    if (!from.trim()) return;
-    const place: SavedPlace = { label: "Rumah", value: from.trim(), name: fromName };
+    if (!fromText.trim()) return;
+    const place: SavedPlace = { label: "Rumah", value: fromCoord ?? fromText.trim(), name: fromName ?? fromText.trim() };
     setPlace("home", place);
     setHome(place);
   };
@@ -77,13 +185,42 @@ export default function Search({ onSearch, onBoard, loading, error }: Props) {
       setWork(undefined);
       return;
     }
-    if (!to.trim()) return;
-    const place: SavedPlace = { label: "Kerja", value: to.trim(), name: toName };
+    if (!toText.trim()) return;
+    const place: SavedPlace = { label: "Kerja", value: toCoord ?? toText.trim(), name: toName ?? toText.trim() };
     setPlace("work", place);
     setWork(place);
   };
 
-  const submit = () => onSearch(from, to, fromName, when || undefined, toName);
+  const submit = () => {
+    onSearch(fromCoord ?? fromText, toCoord ?? toText, fromName ?? fromText, when || undefined, toName ?? toText);
+  };
+
+  const onKey = (field: FieldKey) => (event: KeyboardEvent<HTMLInputElement>) => {
+    const sug = field === "from" ? fromSug : toSug;
+    if (!sug.open || !sug.items.length) {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        submit();
+      }
+      return;
+    }
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setHi((h) => (h + 1) % sug.items.length);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setHi((h) => (h - 1 + sug.items.length) % sug.items.length);
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      pick(field, sug.items[Math.min(hi, sug.items.length - 1)]);
+    } else if (event.key === "Escape") {
+      sug.close();
+    }
+  };
+
+  const blur = (field: FieldKey) => () => {
+    window.setTimeout(() => setActive((current) => (current === field ? null : current)), 120);
+  };
 
   return (
     <div className="screen">
@@ -95,26 +232,12 @@ export default function Search({ onSearch, onBoard, loading, error }: Props) {
       {home || work ? (
         <div className="chips">
           {home ? (
-            <button
-              type="button"
-              className="chip"
-              onClick={() => {
-                setFrom(home.value);
-                setFromName(home.name);
-              }}
-            >
+            <button type="button" className="chip" onClick={() => useSaved("from", home)}>
               ⌂ {home.label}
             </button>
           ) : null}
           {work ? (
-            <button
-              type="button"
-              className="chip"
-              onClick={() => {
-                setTo(work.value);
-                setToName(work.name);
-              }}
-            >
+            <button type="button" className="chip" onClick={() => useSaved("to", work)}>
               ◎ {work.label}
             </button>
           ) : null}
@@ -125,11 +248,11 @@ export default function Search({ onSearch, onBoard, loading, error }: Props) {
         <Field
           label="DARI"
           sublabel="FROM"
-          value={from}
-          onChange={(value) => {
-            setFrom(value);
-            setFromName(undefined);
-          }}
+          value={fromText}
+          onChange={(value) => change("from", value)}
+          onFocus={() => setActive("from")}
+          onBlur={blur("from")}
+          onKeyDown={onKey("from")}
           placeholder="Stesen, hentian, alamat"
           action={
             <button
@@ -142,18 +265,24 @@ export default function Search({ onSearch, onBoard, loading, error }: Props) {
               {home ? "★" : "☆"}
             </button>
           }
-        />
+        >
+          {active === "from" && fromSug.open && fromSug.items.length ? (
+            <SuggestList items={fromSug.items} hi={hi} onPick={(item) => pick("from", item)} onHover={setHi} />
+          ) : null}
+        </Field>
+
         <button type="button" className="swap" onClick={swap} aria-label="Tukar asal dan destinasi">
           ↑↓
         </button>
+
         <Field
           label="KE"
           sublabel="TO"
-          value={to}
-          onChange={(value) => {
-            setTo(value);
-            setToName(undefined);
-          }}
+          value={toText}
+          onChange={(value) => change("to", value)}
+          onFocus={() => setActive("to")}
+          onBlur={blur("to")}
+          onKeyDown={onKey("to")}
           placeholder="Destinasi"
           action={
             <button
@@ -166,7 +295,11 @@ export default function Search({ onSearch, onBoard, loading, error }: Props) {
               {work ? "★" : "☆"}
             </button>
           }
-        />
+        >
+          {active === "to" && toSug.open && toSug.items.length ? (
+            <SuggestList items={toSug.items} hi={hi} onPick={(item) => pick("to", item)} onHover={setHi} />
+          ) : null}
+        </Field>
       </div>
 
       <Button variant="secondary" block className="locate" onClick={locate} disabled={locating || loading}>

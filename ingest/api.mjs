@@ -19,8 +19,8 @@ import { createServer } from "node:http";
 import { statSync } from "node:fs";
 import { resolve } from "node:path";
 import { openDb, metaMap, klNow, ymdInfo, hhmm } from "./lib.mjs";
-import { buildIndex, planJourney, planAlternatives, ACCESS_RADIUS_M } from "./router.mjs";
-import { geocode } from "./geocode.mjs";
+import { buildIndex, planJourney, planAlternatives, ACCESS_RADIUS_M, haversineM } from "./router.mjs";
+import { geocode, suggestPlaces } from "./geocode.mjs";
 import { walkMatrix } from "./walk.mjs";
 import { liveStatus } from "./live.mjs";
 import { searchStops, nextDepartures } from "./board.mjs";
@@ -284,6 +284,37 @@ createServer(async (req, res) => {
         return json(res, 200, { updated_at: live.updated_at, ...hit });
       }
       return json(res, 200, live);
+    }
+    if (url.pathname === "/api/suggest") {
+      const q = (url.searchParams.get("q") ?? "").trim();
+      if (q.length < 2) return json(res, 200, { q, stops: [], places: [] });
+      freshen();
+      const lat = Number.parseFloat(url.searchParams.get("lat") ?? "");
+      const lon = Number.parseFloat(url.searchParams.get("lon") ?? "");
+      const here = Number.isFinite(lat) && Number.isFinite(lon) ? { lat, lon } : null;
+      const dist = (p) => (here ? Math.round(haversineM(here, p)) : null);
+
+      // One station can appear several times (KG09 + SA1 at Bandar Utama); same name within
+      // 500 m is one answer.
+      const stops = [];
+      for (const stop of searchStops(index, q, 20, here)) {
+        const dup = stops.some((s) => s.name.toLowerCase() === stop.name.toLowerCase() && haversineM(s, stop) < 500);
+        if (dup) continue;
+        stops.push({ ...stop, distance_m: dist(stop) });
+        if (stops.length >= 5) break;
+      }
+
+      // Places come from Nominatim and cost a rate-limited request, so the client asks for them
+      // in a second call and shows the stops immediately.
+      let places = [];
+      if (url.searchParams.get("places") === "1") {
+        places = (await suggestPlaces(q, 8))
+          .map((place) => ({ ...place, distance_m: dist(place) }))
+          .sort((a, b) => (a.distance_m ?? Infinity) - (b.distance_m ?? Infinity));
+        const near = places.filter((place) => place.distance_m != null && place.distance_m <= 150_000);
+        places = (near.length >= 2 ? near : places).slice(0, 4);
+      }
+      return json(res, 200, { q, stops, places });
     }
     if (url.pathname === "/api/stops") {
       const q = url.searchParams.get("q") ?? "";

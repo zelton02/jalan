@@ -6,7 +6,7 @@
  *   node ingest/board.mjs --stop "bus|1000383"
  */
 import { activeServices, dayBefore, hhmm, klNow } from "./lib.mjs";
-import { lineIdFor } from "./router.mjs";
+import { lineIdFor, haversineM } from "./router.mjs";
 
 const SERVICE_DAY_CUTOFF = 4 * 3600;
 const HORIZON_SEC = 90 * 60;
@@ -39,27 +39,36 @@ export function boardNow() {
 }
 
 /** Name search over the stop index. Rail stations rank above bus stops with the same name. */
-export function searchStops(index, query, limit = 8) {
+export function searchStops(index, query, limit = 8, near = null) {
   const q = String(query ?? "").trim().toLowerCase();
   if (q.length < 2) return [];
+  const compactQ = q.replace(/[^a-z0-9]+/g, "");
 
   const hits = [];
   for (const stop of index.stops) {
     const name = stop.name.toLowerCase();
+    const compact = name.replace(/[^a-z0-9]+/g, "");
     const at = name.indexOf(q);
-    if (at < 0) continue;
+    const atCompact = compact.indexOf(compactQ);
+    if (at < 0 && atCompact < 0) continue; // "MID VALLEY" must also find MIDVALLEY
     const patterns = index.patternsAtStop.get(stop.key);
     if (!patterns?.length) continue;
 
     // "UTAR" must beat "CYBERJAYA UTARA": exact token / phrase beats a token prefix.
     const tokens = name.split(/[^a-z0-9]+/).filter(Boolean);
-    const rank = tokens.includes(q) || name.startsWith(q)
+    const rank = tokens.includes(q) || name.startsWith(q) || compact.startsWith(compactQ)
       ? 0
       : tokens.some((t) => t.startsWith(q)) ? 1 : 2;
     const railBonus = stop.feed === "rail" || stop.feed === "ktmb" ? 0 : 0.5;
-    hits.push({ stop, patterns: patterns.length, score: rank + railBonus, at });
+    hits.push({
+      stop,
+      patterns: patterns.length,
+      score: rank + railBonus,
+      at: at >= 0 ? at : atCompact + 100,
+      distance: near ? haversineM(near, stop) : Infinity,
+    });
   }
-  hits.sort((a, b) => a.score - b.score || a.at - b.at || b.patterns - a.patterns);
+  hits.sort((a, b) => a.score - b.score || a.distance - b.distance || a.at - b.at || b.patterns - a.patterns);
 
   const picked = [];
   for (const hit of hits) {

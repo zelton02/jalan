@@ -127,6 +127,13 @@ promise for the specific trip**, and the UI says so. Rail has no realtime at all
 
 `npm run live -- --route U5900` prints the vehicles behind the number.
 
+### Geocoding
+
+`ingest/geocode.mjs` resolves addresses through Nominatim (1 req/s, a real User-Agent) and caches
+the result in `data/geocode.json` permanently. Suggestions use the same budget: `data/suggest.json`
+keeps 14 days of prefix results capped at 400 queries, and queued keystrokes are dropped when a
+newer one arrives, so typing a name costs at most one request per second.
+
 ### Walking times
 
 `ingest/walk.mjs` uses a self-hosted OSRM foot graph (OpenStreetMap Klang Valley, built by

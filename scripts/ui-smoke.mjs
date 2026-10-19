@@ -60,6 +60,17 @@ await page.locator("button", { hasText: "lokasi" }).click();
 await page.waitForTimeout(1500);
 console.log("GEO:", (await text()).replace(/\n+/g, " | ").slice(0, 300));
 
+// 4b. suggestions: typing a stop name opens the list, picking fills the field
+await page.goto(BASE, { waitUntil: "networkidle" });
+const fromInput = page.locator(".field__input").first();
+await fromInput.click();
+await fromInput.fill("mid valley");
+await page.waitForSelector(".suggest__item", { timeout: 8000 });
+const suggestCount = await page.locator(".suggest__item").count();
+await page.locator(".suggest__item").first().click();
+await page.waitForTimeout(200);
+console.log("SUGGEST:", suggestCount, "items |", await fromInput.inputValue());
+
 // 5. stop board: search a stop, then read its departures
 await page.goto(BASE, { waitUntil: "networkidle" });
 await page.locator("button", { hasText: "Jadual hentian" }).click();

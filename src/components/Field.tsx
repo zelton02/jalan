@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from "react";
+import { useId, type KeyboardEvent, type ReactNode } from "react";
 
 type Props = {
   label: string;
@@ -7,9 +7,13 @@ type Props = {
   onChange: (value: string) => void;
   placeholder?: string;
   action?: ReactNode;
+  onFocus?: () => void;
+  onBlur?: () => void;
+  onKeyDown?: (event: KeyboardEvent<HTMLInputElement>) => void;
+  children?: ReactNode; // suggestion dropdown, positioned under the input
 };
 
-export default function Field({ label, sublabel, value, onChange, placeholder, action }: Props) {
+export default function Field({ label, sublabel, value, onChange, placeholder, action, onFocus, onBlur, onKeyDown, children }: Props) {
   const id = useId();
   return (
     <div className="field">
@@ -25,9 +29,16 @@ export default function Field({ label, sublabel, value, onChange, placeholder, a
         value={value}
         placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
+        onFocus={onFocus}
+        onBlur={onBlur}
+        onKeyDown={onKeyDown}
         autoComplete="off"
         spellCheck={false}
+        role="combobox"
+        aria-autocomplete="list"
+        aria-expanded={Boolean(children)}
       />
+      {children}
     </div>
   );
 }

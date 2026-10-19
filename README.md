@@ -22,6 +22,14 @@ That stance produces the rules in [`AESTHETIC.md`](./AESTHETIC.md). Read it befo
 | --- | --- | --- |
 | ![](pr-assets/screen-search.png) | ![](pr-assets/screen-results.png) | ![](pr-assets/screen-journey.png) |
 
+## Search
+
+Both fields are search-as-you-type. Stops come from the local GTFS index and appear instantly;
+places come from Nominatim, rate-limited and fetched in a second request, so they slide in under
+the stops a moment later. Picking a stop sends its coordinates, not its name, so "Bandar Utama"
+routes from the station instead of the suburb centroid. Distances use the last "use my location"
+or the other field as the reference point; without one, the list is name-ranked only.
+
 ## Data pipeline
 
 The app runs on Malaysia's official GTFS feeds, not mock data.
